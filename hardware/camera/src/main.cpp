@@ -12,38 +12,34 @@
 #include <Firebase_ESP_Client.h>
 #include "addons/TokenHelper.h"
 #include "addons/RTDBHelper.h"
-#include "base64.h"
-#include "config.h" // <- Importa as configurações
 
 ESP32Time rtc(0);
-struct tm timeinfo;
-unsigned long previousMillis = 0;
+
+// Config Wi-Fi
+#define WIFI_SSID "SeuSSID"
+#define WIFI_PASSWORD "SuaSenha"
 
 // Firebase
-FirebaseData fbdo;
-FirebaseAuth auth;
-FirebaseConfig config;
-unsigned long sendDataPrevMillis = 0;
-int count = 0;
-bool signupOK = false;
-String userUID = "";
+#define API_KEY "SUA_API_KEY"
+#define DATABASE_URL "https://seu-projeto.firebaseio.com/"
+#define STORAGE_BUCKET_ID "seu-projeto.appspot.com"
 
-// Controle de eventos
+FirebaseData fbdo;
+FirebaseAuth auth; // deixado vazio para acesso sem autenticação
+FirebaseConfig config;
+
+String idCliente = "";
+String idDispositivo = "";
+String macAddress = "";
+
 EventGroupHandle_t xEventGroupKey;
 SemaphoreHandle_t xSemaphore;
-TaskHandle_t taskHandlePorta, taskHandleVerificaPorta;
-QueueHandle_t queuePortaStatus = xQueueCreate(1, sizeof(int));
-QueueHandle_t queuePortaTimer = xQueueCreate(1, sizeof(unsigned long));
 QueueHandle_t queueCapturarFoto = xQueueCreate(1, sizeof(int));
 
-// Flags
-#define EV_START (1 << 0)
 #define EV_WIFI (1 << 1)
-#define EV_FIRE (1 << 2)
-#define EV_STATUS_PORTA (1 << 10)
-#define EV_BUZZER (1 << 11)
+#define FLASH_PIN 4
 
-// GPIO Câmera
+// GPIOs da câmera
 #define PWDN_GPIO_NUM 32
 #define RESET_GPIO_NUM -1
 #define XCLK_GPIO_NUM 0
@@ -60,23 +56,8 @@ QueueHandle_t queueCapturarFoto = xQueueCreate(1, sizeof(int));
 #define VSYNC_GPIO_NUM 25
 #define HREF_GPIO_NUM 23
 #define PCLK_GPIO_NUM 22
-#define FLASH_PIN 4
 
-// Stream (desativado neste exemplo)
-#define PART_BOUNDARY "123456789000000000000987654321"
-static const char *_STREAM_CONTENT_TYPE = "multipart/x-mixed-replace;boundary=" PART_BOUNDARY;
-static const char *_STREAM_BOUNDARY = "\r\n--" PART_BOUNDARY "\r\n";
-static const char *_STREAM_PART = "Content-Type: image/jpeg\r\nContent-Length: %u\r\n\r\n";
-
-httpd_handle_t stream_httpd = NULL;
-
-// === Funções Principais === //
-
-void InicializaEsp(void *pvParameters) {
-  WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
-  Serial.begin(115200);
-  Serial.setDebugOutput(false);
-
+void initCamera() {
   camera_config_t config;
   config.ledc_channel = LEDC_CHANNEL_0;
   config.ledc_timer = LEDC_TIMER_0;
@@ -98,116 +79,93 @@ void InicializaEsp(void *pvParameters) {
   config.pin_reset = RESET_GPIO_NUM;
   config.xclk_freq_hz = 20000000;
   config.pixel_format = PIXFORMAT_JPEG;
-  pinMode(FLASH_PIN, OUTPUT);
-
-  config.frame_size = FRAMESIZE_UXGA;
-  config.jpeg_quality = 40;
+  config.frame_size = FRAMESIZE_SVGA;
+  config.jpeg_quality = 12;
   config.fb_count = 2;
 
-  if (esp_camera_init(&config) != ESP_OK) {
-    Serial.println("Erro ao iniciar a câmera.");
-    return;
-  }
-
-  xEventGroupSetBits(xEventGroupKey, EV_START);
-  vTaskDelete(NULL);
+  pinMode(FLASH_PIN, OUTPUT);
+  esp_camera_init(&config);
 }
 
-void initWiFi(void *pvParameters) {
+void connectWiFi() {
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  Serial.print("Conectando-se na rede: ");
-  Serial.println(WIFI_SSID);
   while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
     Serial.print(".");
-    vTaskDelay(pdMS_TO_TICKS(100));
   }
-
-  Serial.println("\nConectado com o IP: " + WiFi.localIP().toString());
-  configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET_SEC, NTP_SERVER_1, NTP_SERVER_2, NTP_SERVER_3);
-  struct tm timeinfo;
-  int attempts = 0;
-  while (!getLocalTime(&timeinfo) && attempts++ < 30) vTaskDelay(pdMS_TO_TICKS(100));
-  if (attempts < 30) rtc.setTimeStruct(timeinfo);
-  else Serial.println("Falha ao obter hora NTP.");
+  Serial.println("\nWiFi conectado: " + WiFi.localIP().toString());
   xEventGroupSetBits(xEventGroupKey, EV_WIFI);
-  vTaskDelete(NULL);
 }
 
-void monitorWiFi(void *pvParameters) {
-  for (;;) {
-    if (WiFi.status() != WL_CONNECTED && (xEventGroupGetBits(xEventGroupKey) & EV_WIFI)) {
-      Serial.println("WiFi desconectado. Tentando reconectar...");
-      if (xTaskCreatePinnedToCore(initWiFi, "initWiFi", 5000, NULL, 14, NULL, 1) == pdPASS)
-        xEventGroupClearBits(xEventGroupKey, EV_WIFI);
-    }
-    vTaskDelay(pdMS_TO_TICKS(6000));
+void obterMAC() {
+  uint8_t mac[6];
+  esp_read_mac(mac, ESP_MAC_WIFI_STA);
+  char macStr[18];
+  sprintf(macStr, "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+  macAddress = String(macStr);
+}
+
+void carregarConfiguracaoDoFirebase() {
+  String path = "/CONFIGS_DISPOSITIVOS/" + macAddress;
+  if (Firebase.RTDB.getJSON(&fbdo, path)) {
+    FirebaseJson &json = fbdo.jsonObject();
+    FirebaseJsonData result;
+
+    if (json.get(result, "id_cliente")) idCliente = result.to<String>();
+    if (json.get(result, "id_dispositivo")) idDispositivo = result.to<String>();
+
+    Serial.println("idCliente: " + idCliente);
+    Serial.println("idDispositivo: " + idDispositivo);
+  } else {
+    Serial.println("Falha ao carregar configuração: " + fbdo.errorReason());
   }
 }
 
-void conectarFirebase(void *pvParameters) {
-  config.api_key = API_KEY;
-  auth.user.email = USER_EMAIL;
-  auth.user.password = USER_PASSWORD;
-  config.database_url = DATABASE_URL;
-
-  for (;;) {
-    if (xEventGroupGetBits(xEventGroupKey) & EV_WIFI) {
-      Serial.println("Conectando ao Firebase...");
-      signupOK = true;
-      fbdo.setBSSLBufferSize(16384, 16384);
-      fbdo.setResponseSize(4096);
-      Firebase.begin(&config, &auth);
-      Firebase.reconnectWiFi(true);
-      userUID = auth.token.uid.c_str();
-      xEventGroupSetBits(xEventGroupKey, EV_FIRE);
-      vTaskDelete(NULL);
-    }
-  }
-}
-
-void monitorFirebase(void *pvParameters) {
-  for (;;) {
-    if (!signupOK || !Firebase.ready()) {
-      Serial.println("Firebase desconectado. Tentando reconectar...");
-      if ((xEventGroupGetBits(xEventGroupKey) & EV_FIRE)) {
-        if (xTaskCreatePinnedToCore(conectarFirebase, "conectarFirebase", 5000, NULL, 14, NULL, 1) == pdPASS)
-          xEventGroupClearBits(xEventGroupKey, EV_FIRE);
-      }
-    }
-    vTaskDelay(pdMS_TO_TICKS(9000));
-  }
-}
-
-void enviarDadosFirebase(void *pvParameters) {
+void enviarImagemParaFirebase(void *pvParameters) {
   for (;;) {
     int capturarFoto = 0;
-    if (signupOK && xSemaphoreTake(xSemaphore, pdMS_TO_TICKS(100)) == pdTRUE) {
+    if (Firebase.ready() && xSemaphoreTake(xSemaphore, pdMS_TO_TICKS(100)) == pdTRUE) {
       if (xQueueReceive(queueCapturarFoto, &capturarFoto, pdMS_TO_TICKS(100)) == pdTRUE && capturarFoto == 1) {
         digitalWrite(FLASH_PIN, HIGH);
         camera_fb_t *fb = esp_camera_fb_get();
-        vTaskDelay(pdMS_TO_TICKS(500));
+        delay(300);
         digitalWrite(FLASH_PIN, LOW);
 
         if (!fb) {
           Serial.println("Erro ao capturar imagem.");
-          return;
+          xSemaphoreGive(xSemaphore);
+          continue;
         }
 
-        String base64_image = base64::encode((uint8_t *)fb->buf, fb->len);
-        char timestamp[20];
-        strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", &rtc.getTimeStruct());
+        struct tm timeinfo = rtc.getTimeStruct();
+        char timestampStr[25];
+        strftime(timestampStr, sizeof(timestampStr), "%Y-%m-%d_%H-%M-%S", &timeinfo);
 
-        FirebaseJson json;
-        json.set("timestamp", timestamp);
-        json.set("base64_image", base64_image);
-        String path = "/users/" + String(userUID) + "/camera/cameraData/" + String(timestamp);
-        if (Firebase.RTDB.setJSON(&fbdo, path.c_str(), &json))
-          Serial.println("Dados enviados para o Firebase");
-        else {
-          Serial.println("Erro ao enviar dados:");
-          Serial.println(path);
-          Serial.println(fbdo.errorReason());
+        String caminhoStorage = "/clientes/" + idCliente + "/dispositivos/" + idDispositivo + "/" + String(timestampStr) + ".jpg";
+        String contentType = "image/jpeg";
+
+        if (Firebase.Storage.upload(&fbdo, caminhoStorage.c_str(), mem_storage_type_flash, fb->buf, fb->len, contentType.c_str())) {
+          Serial.println("Upload concluído no Storage");
+
+          String pathRTDB = String("/CLIENTES/") + idCliente + "/DISPOSITIVOS/" + idDispositivo + "/dados_coletados/coleta/" + timestampStr;
+
+
+          FirebaseJson json;
+          json.set("timestamp", timestampStr);
+          json.set("imagem_ref", caminhoStorage);
+          json.set("dados_temp_umidade", 0);
+          json.set("dados_pos_processamento", "");
+
+          if (Firebase.RTDB.setJSON(&fbdo, pathRTDB.c_str(), &json)) {
+            Serial.println("Referência salva no RTDB");
+          } else {
+            Serial.println("Erro ao salvar RTDB: " + fbdo.errorReason());
+          }
+
+        } else {
+          Serial.println("Erro no upload: " + fbdo.errorReason());
         }
+
         esp_camera_fb_return(fb);
       }
       xSemaphoreGive(xSemaphore);
@@ -216,39 +174,31 @@ void enviarDadosFirebase(void *pvParameters) {
   }
 }
 
-void consultarEnviarValorInteiroFirebase(void *pvParameters) {
-  String path = "/users/" + userUID + "/camera/control";
-  for (;;) {
-    if (signupOK && xSemaphoreTake(xSemaphore, pdMS_TO_TICKS(100)) == pdTRUE) {
-      if (Firebase.RTDB.getInt(&fbdo, path.c_str()) && fbdo.dataType() == "int") {
-        int valor = fbdo.intData();
-        xQueueSend(queueCapturarFoto, &valor, 0);
-        if (valor == 1) Firebase.RTDB.setInt(&fbdo, path.c_str(), 0);
-      }
-      xSemaphoreGive(xSemaphore);
-    }
-    vTaskDelay(pdMS_TO_TICKS(1000));
-  }
-}
-
-// === Setup & Loop === //
-
 void setup() {
   Serial.begin(115200);
+  delay(1000);
   xEventGroupKey = xEventGroupCreate();
   xSemaphore = xSemaphoreCreateBinary();
-  if (xSemaphore) xSemaphoreGive(xSemaphore);
+  xSemaphoreGive(xSemaphore);
 
-  xTaskCreate(InicializaEsp, "InicializaEsp", 5000, NULL, 15, NULL);
-  vTaskDelay(pdMS_TO_TICKS(500));
-  xTaskCreate(initWiFi, "initWiFi", 5000, NULL, 14, NULL);
-  xTaskCreate(conectarFirebase, "conectarFirebase", 5000, NULL, 14, NULL);
-  vTaskDelay(pdMS_TO_TICKS(2000));
-  xTaskCreate(monitorWiFi, "monitorWiFi", 5000, NULL, 14, NULL);
-  xTaskCreate(enviarDadosFirebase, "enviarDadosFirebase", 16384, NULL, 1, NULL);
-  xTaskCreate(consultarEnviarValorInteiroFirebase, "consultarEnviarValorInteiroFirebase", 8096, NULL, 1, NULL);
+  connectWiFi();
+  obterMAC();
+  initCamera();
+
+  config.api_key = API_KEY;
+  config.database_url = DATABASE_URL;
+  config.storage_bucket = STORAGE_BUCKET_ID;
+
+  Firebase.begin(&config, &auth);
+  Firebase.reconnectWiFi(true);
+
+  carregarConfiguracaoDoFirebase();
+
+  xTaskCreate(enviarImagemParaFirebase, "enviarImagem", 8192, NULL, 1, NULL);
+
+  int iniciar = 1;
+  xQueueSend(queueCapturarFoto, &iniciar, 0); // dispara envio inicial
 }
 
 void loop() {
-  // vazio, todas as operações são multitarefa
 }

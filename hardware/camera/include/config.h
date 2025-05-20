@@ -16,7 +16,7 @@
 #define API_KEY "AIzaSyAJtADhlZbuAywvHgIU5X9HOslAI8kRoyc"
 #define DATABASE_URL "https://agroscan-c8a09-default-rtdb.firebaseio.com"
 #define PROJECT_ID "agroscan-c8a09"
-#define STORAGEBUCKET_ID "agroscan-c8a09.firebasestorage.app"
+#define STORAGE_BUCKET_ID "agroscan-c8a09.firebasestorage.app"
 
 // #define USER_EMAIL "proactive@proactive.com"
 // #define USER_PASSWORD "Proactive@2024"
