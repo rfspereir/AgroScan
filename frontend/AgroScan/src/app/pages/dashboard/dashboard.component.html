@@ -1,0 +1,38 @@
+<div class="dashboard">
+  <div class="left-panel">
+    <div class="card">
+      <h3>Variação de Umidade</h3>
+      <div class="info">
+        💧 {{ umidade }}%
+        <span [class.down]="variacaoUmidade < 0">▼ {{ variacaoUmidade }}%</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Variação de Temperatura</h3>
+      <div class="info">
+        🌡️ {{ temperatura }}°C ({{ temperaturaFahrenheit }}°F)
+        <br />
+        ☁️ {{ coberturaNuvem }}%
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Fotos</h3>
+      <input type="date" [(ngModel)]="dataSelecionada" (change)="carregarFotos()" />
+      <div class="fotos">
+        <img *ngFor="let foto of fotos" [src]="foto" alt="Foto do campo" />
+      </div>
+    </div>
+  </div>
+
+  <div class="right-panel card">
+    <h3>Desenvolvimento Praga X</h3>
+    <canvas baseChart
+      [datasets]="[{ data: dadosPraga, label: 'Praga X' }]"
+      [labels]="labelsPraga"
+      [options]="chartOptions"
+      chartType="line">
+    </canvas>
+  </div>
+</div>

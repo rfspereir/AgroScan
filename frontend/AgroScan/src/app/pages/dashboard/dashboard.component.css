@@ -1,0 +1,46 @@
+.dashboard {
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+
+.left-panel {
+  flex: 1;
+  min-width: 300px;
+}
+
+.right-panel {
+  flex: 1;
+  min-width: 300px;
+}
+
+.card {
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.info {
+  font-size: 1.2rem;
+  margin-top: 0.5rem;
+}
+
+.down {
+  color: red;
+}
+
+.fotos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.fotos img {
+  width: 100px;
+  height: 100px;
+  object-fit: cover;
+  border-radius: 4px;
+}
