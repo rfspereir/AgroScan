@@ -1,6 +1,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { DashboardComponent } from './dashboard.component';
+import { Database } from '@angular/fire/database';
+import { Storage } from '@angular/fire/storage';
 
 describe('DashboardComponent', () => {
   let component: DashboardComponent;
@@ -8,7 +10,11 @@ describe('DashboardComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [DashboardComponent]
+      imports: [DashboardComponent],
+      providers: [
+        { provide: Database, useValue: {} },
+        { provide: Storage, useValue: {} }
+      ]
     })
     .compileComponents();
 

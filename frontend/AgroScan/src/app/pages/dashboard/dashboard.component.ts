@@ -1,9 +1,9 @@
-import { Component } from '@angular/core';
+import { Component, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
-import { provideDatabase, getDatabase, Database, ref, onValue } from '@angular/fire/database';
-import { provideStorage, getStorage, Storage, ref as storageRef, listAll, getDownloadURL } from '@angular/fire/storage';
+import { Database, ref, onValue } from '@angular/fire/database';
+import { Storage, ref as storageRef, listAll, getDownloadURL } from '@angular/fire/storage';
 import { NgChartsModule } from 'ng2-charts';
 
 
@@ -17,7 +17,7 @@ import { NgChartsModule } from 'ng2-charts';
   styleUrls: ['./dashboard.component.css'],
   imports: [CommonModule, FormsModule, NgChartsModule ]
 })
-export class DashboardComponent {
+export class DashboardComponent implements OnDestroy {
   umidade = 0;
   variacaoUmidade = 0;
 
@@ -30,6 +30,10 @@ export class DashboardComponent {
 
   labelsPraga: string[] = [];
   dadosPraga: number[] = [];
+
+  private umidadeUnsub?: () => void;
+  private temperaturaUnsub?: () => void;
+  private pragaUnsub?: () => void;
 
   chartData = {
     labels: [] as string[],
@@ -65,13 +69,13 @@ export class DashboardComponent {
 
   
   carregarDadosMeteorologicos() {
-    onValue(ref(this.db, 'dados/umidade'), snapshot => {
+    this.umidadeUnsub = onValue(ref(this.db, 'dados/umidade'), snapshot => {
       const val = snapshot.val();
       this.umidade = val.atual;
       this.variacaoUmidade = val.variacao;
     });
 
-    onValue(ref(this.db, 'dados/temperatura'), snapshot => {
+    this.temperaturaUnsub = onValue(ref(this.db, 'dados/temperatura'), snapshot => {
       const val = snapshot.val();
       this.temperatura = val.celsius;
       this.temperaturaFahrenheit = val.fahrenheit;
@@ -80,7 +84,7 @@ export class DashboardComponent {
   }
 
   carregarGraficoPraga() {
-    onValue(ref(this.db, 'dados/pragaX'), snapshot => {
+    this.pragaUnsub = onValue(ref(this.db, 'dados/pragaX'), snapshot => {
       const val = snapshot.val();
       this.labelsPraga = val.map((p: any) => p.ano);
       this.dadosPraga = val.map((p: any) => p.valor);
@@ -94,6 +98,12 @@ export class DashboardComponent {
     const fotosRef = storageRef(this.storage, pasta);
     const result = await listAll(fotosRef);
     this.fotos = await Promise.all(result.items.map(item => getDownloadURL(item)));
+  }
+
+  ngOnDestroy(): void {
+    this.umidadeUnsub?.();
+    this.temperaturaUnsub?.();
+    this.pragaUnsub?.();
   }
 }
 
