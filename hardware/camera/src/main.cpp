@@ -15,30 +15,15 @@
 //TODO: REMOVER O USO DE BASE64 PARA ENVIAR AS IMAGENS
 #include "base64.h"
 #include "config.h"
-
-//TODO: 1.CONFIGURAR PARA UTILIZAR O ARQUIVO CONFIG.H
-      
-
-#define WIFI_SSID "Galaxy Note1043b2"
-#define WIFI_PASSWORD "fjid4169"
-
+#include "DHT.h"
+#define DHTPIN 15      // Escolha um pino digital disponível
+#define DHTTYPE DHT22  // Tipo do sensor
+DHT dht(DHTPIN, DHTTYPE);
+   
 ESP32Time rtc(0);
 // Estrutura para manter o tempo
 struct tm timeinfo;
 unsigned long previousMillis = 0;
-
-// Define o servidor NTP
-const char *ntpServer1 = "a.st1.ntp.br";
-const char *ntpServer2 = "time.nist.gov";
-const char *ntpServer3 = "time.google.com";
-const long gmtOffset_sec = -10800; // Defina o fuso horário (em segundos) -3 horas para Brasília
-const int daylightOffset_sec = 0;  // Horário de verão
-
-// Firebase RTDB
-#define API_KEY "AIzaSyDuCIrTT_CQjwBTzwdqT8exzWlqmqrs2ao"                   // Firebase project API Key
-#define DATABASE_URL "https://proactive-ae334-default-rtdb.firebaseio.com/" // RTDB URLefine the RTDB URL */
-#define USER_EMAIL "proactive@proactive.com"                                // Firebase login email
-#define USER_PASSWORD "Proactive@2024"                                      // Firebase login password
 
 // Define Firebase Data object
 FirebaseData fbdo;
@@ -161,7 +146,7 @@ void initWiFi(void *pvParameters)
         Serial.println();
         Serial.print("Conectado com o IP: ");
         Serial.println(WiFi.localIP());
-        configTime(gmtOffset_sec, daylightOffset_sec, ntpServer1, ntpServer2, ntpServer3);
+        configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET_SEC, NTP_SERVER_1, NTP_SERVER_2, NTP_SERVER_3);
         struct tm timeinfo;
         const int timeout = 30;
         int attempts = 0;
@@ -225,8 +210,8 @@ void conectarFirebase(void *pvParameters)
   const EventBits_t xBitsToWaitFor = (EV_WIFI);
   EventBits_t xEventGroupValue;
   config.api_key = API_KEY;
-  auth.user.email = USER_EMAIL;
-  auth.user.password = USER_PASSWORD;
+  // auth.user.email = USER_EMAIL;
+  // auth.user.password = USER_PASSWORD;
   config.database_url = DATABASE_URL;
 
   for (;;)
