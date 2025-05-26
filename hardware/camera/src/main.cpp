@@ -12,8 +12,7 @@
 #include <Firebase_ESP_Client.h>
 #include "addons/TokenHelper.h" //Provide the token generation process info.
 #include "addons/RTDBHelper.h"  //Provide the RTDB payload printing info and other helper functions.
-//TODO: REMOVER O USO DE BASE64 PARA ENVIAR AS IMAGENS
-#include "base64.h"
+#include <SPIFFS.h>
 #include "config.h"
 #include "DHT.h"
 #define DHTPIN 15      // Escolha um pino digital disponível
@@ -264,80 +263,98 @@ void monitorFirebase(void *pvParameters)
 
 //-------------------------------------------------------------------
 
-//TODO: VERIFICAR E AJUSTAR PARA A NOVA LOGICA, CAPTURA DE FOTOS POR TEMPO, ENVIO DA IMAGEM PARA O STORAGE
-
 void enviarDadosFirebase(void *pvParameters)
 {
-
   for (;;)
   {
     int capturarFoto = 0;
     if (signupOK)
     {
-      // Tentar pegar o semáforo
       if (xSemaphoreTake(xSemaphore, pdMS_TO_TICKS(100)) == pdTRUE)
       {
-        // Coletar dados das filas
-        if ((xQueueReceive(queueCapturarFoto, &capturarFoto, pdMS_TO_TICKS(100))) == pdTRUE)
+        if ((xQueueReceive(queueCapturarFoto, &capturarFoto, pdMS_TO_TICKS(100))) == pdTRUE && capturarFoto == 1)
         {
-          printf("Capturar foto: %d\n", capturarFoto);
+          Serial.println("Capturando e enviando imagem...");
 
-          if (capturarFoto == 1)
+          digitalWrite(FLASH_PIN, HIGH);
+          vTaskDelay(pdMS_TO_TICKS(200));
+          camera_fb_t *fb = esp_camera_fb_get();
+          digitalWrite(FLASH_PIN, LOW);
+
+          if (!fb)
           {
-            // Liga o flash
-            digitalWrite(FLASH_PIN, HIGH);
+            Serial.println("Erro ao capturar imagem");
+            xSemaphoreGive(xSemaphore);
+            continue;
+          }
 
-            // Obter o timestamp atual
-            struct tm timeinfo = rtc.getTimeStruct();
+          // Monta timestamp
+          struct tm timeinfo = rtc.getTimeStruct();
+          char timestamp[30];
+          strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", &timeinfo);
+          String filename = "/img_" + String(timestamp) + ".jpg";
 
-            // Captura a imagem
-            camera_fb_t *fb = esp_camera_fb_get();
-            if (!fb)
-            {
-              Serial.println("Erro ao capturar a imagem");
-              return;
-            }
-            vTaskDelay(pdMS_TO_TICKS(500));
+          // Salva imagem localmente
+          if (!SPIFFS.begin(true)) {
+            Serial.println("Erro ao iniciar SPIFFS");
+            esp_camera_fb_return(fb);
+            xSemaphoreGive(xSemaphore);
+            continue;
+          }
 
-             digitalWrite(FLASH_PIN, LOW);
+          File file = SPIFFS.open(filename, FILE_WRITE);
+          if (!file)
+          {
+            Serial.println("Erro ao abrir arquivo local");
+            esp_camera_fb_return(fb);
+            xSemaphoreGive(xSemaphore);
+            continue;
+          }
 
-            // Converte a imagem para base64
-            String base64_image = base64::encode((uint8_t *)fb->buf, fb->len);
+          file.write(fb->buf, fb->len);
+          file.close();
+          esp_camera_fb_return(fb);
 
-            // Envia a imagem para o Firebase RTDB
-            // Estruturar os dados em um formato JSON
-            char timestamp[20];
-            strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", &timeinfo);
+          // Caminho no Firebase Storage
+          String storagePath = "/users/" + userUID + "/camera/" + String(timestamp) + ".jpg";
+
+          if (Firebase.Storage.upload(&fbdo, STORAGE_BUCKET_ID, storagePath.c_str(),
+                                      mem_storage_type_flash, filename.c_str(), "image/jpeg"))
+          {
+            Serial.println("Upload bem-sucedido no Firebase Storage!");
+
+            // Leitura do DHT
+            float temperatura = dht.readTemperature();
+            float umidade = dht.readHumidity();
 
             FirebaseJson json;
             json.set("timestamp", timestamp);
-            json.set("base64_image", base64_image);
+            json.set("url", fbdo.downloadURL());
+            json.set("temperature", isnan(temperatura) ? "NaN" : String(temperatura));
+            json.set("humidity", isnan(umidade) ? "NaN" : String(umidade));
 
-            // Enviar os dados para o Firebase
-            String path = "/users/" + String(userUID) + "/camera/cameraData/" + String(timestamp);
-
-            if (Firebase.RTDB.setJSON(&fbdo, path.c_str(), &json))
-            {
-              Serial.println("Dados enviados para o Firebase");
-            }
+            String dbPath = "/users/" + userUID + "/camera/cameraData/" + String(timestamp);
+            if (Firebase.RTDB.setJSON(&fbdo, dbPath, &json))
+              Serial.println("Metadados enviados com sucesso");
             else
-            {
-              Serial.println("Falha ao enviar dados para o Firebase");
-              Serial.println(path);
-              Serial.println(fbdo.errorReason());
-            }
-            // Libera a imagem
-            esp_camera_fb_return(fb);
+              Serial.println("Erro ao enviar metadados: " + fbdo.errorReason());
           }
+          else
+          {
+            Serial.println("Erro ao fazer upload: " + fbdo.errorReason());
+          }
+
+          SPIFFS.remove(filename); // Limpeza
         }
 
-        // Liberar o semáforo
         xSemaphoreGive(xSemaphore);
       }
     }
-    vTaskDelay(pdMS_TO_TICKS(1000)); // Enviar dados a cada 5 segundos
+
+    vTaskDelay(pdMS_TO_TICKS(1000));
   }
 }
+
 
 void consultarEnviarValorInteiroFirebase(void *pvParameters)
 {
