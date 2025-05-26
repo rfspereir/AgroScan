@@ -1,41 +1,22 @@
 .dashboard {
   display: flex;
-  gap: 2rem;
   flex-wrap: wrap;
-}
-
-.left-panel {
-  flex: 1;
-  min-width: 300px;
-}
-
-.right-panel {
-  flex: 1;
-  min-width: 300px;
+  gap: 2rem;
 }
 
 .card {
-  background: #ffffff;
-  border-radius: 8px;
+  background: #fff;
   padding: 1rem;
-  margin-bottom: 1rem;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-}
-
-.info {
-  font-size: 1.2rem;
-  margin-top: 0.5rem;
-}
-
-.down {
-  color: red;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  flex: 1 1 400px;
 }
 
 .fotos {
   display: flex;
-  flex-wrap: wrap;
   gap: 10px;
-  margin-top: 10px;
+  flex-wrap: wrap;
+  margin-top: 1rem;
 }
 
 .fotos img {

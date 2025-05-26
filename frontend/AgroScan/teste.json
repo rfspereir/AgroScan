@@ -1,0 +1,26 @@
+{
+  "dados": {
+    "umidade": {
+      "atual": 67,
+      "variacao": -2
+    },
+    "temperatura": {
+      "celsius": 31,
+      "fahrenheit": 67,
+      "nuvem": 38
+    },
+    "pragaX": [
+      { "ano": "1994-95", "valor": 90 },
+      { "ano": "1996-97", "valor": 89 },
+      { "ano": "1998-99", "valor": 87 },
+      { "ano": "2000-01", "valor": 85 },
+      { "ano": "2002-03", "valor": 80 },
+      { "ano": "2004-05", "valor": 84 },
+      { "ano": "2006-07", "valor": 86 },
+      { "ano": "2008-09", "valor": 90 },
+      { "ano": "2010-11", "valor": 93 },
+      { "ano": "2012-13", "valor": 94 },
+      { "ano": "2014-15", "valor": 92 }
+    ]
+  }
+}
