@@ -82,7 +82,7 @@ void initWiFi(void *pvParameters) {
     DEBUG(".");
     vTaskDelay(pdMS_TO_TICKS(500));
   }
-  DEBUG("\nConectado com IP: " + WiFi.localIP().toString());
+  DEBUGF("\nConectado com IP: %s\n", WiFi.localIP().toString().c_str());
 
   configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET_SEC, NTP_SERVER_1, NTP_SERVER_2, NTP_SERVER_3);
   struct tm timeinfo;
@@ -116,7 +116,7 @@ void conectarFirebase(void *pvParameters) {
     if (auth.token.uid != "") {
       userUID = auth.token.uid.c_str();
       signupOK = true;
-      DEBUG("\nConectado ao Firebase como UID: " + userUID);
+      DEBUGF("\nConectado ao Firebase como UID: %s\n", userUID);
       xEventGroupSetBits(xEventGroupKey, EV_FIRE);
     } else {
       DEBUG("\nFalha ao obter UID.");
@@ -173,30 +173,28 @@ void enviarDadosFirebaseComFoto(void *pvParameters) {
       File f = LittleFS.open(localPath, FILE_WRITE);
       f.write(fb->buf, fb->len);
       f.close();
-
-      // 2) faz upload ao Storage
-      String remotePath =
-        "/users/" + userUID + "/camera/images/" + String(timestamp) + ".jpg";
+      DEBUGF("Foto capturada: %s (%d bytes)\n", localPath, fb->len);
+      MB_String remotePath = MB_String("/users/") + userUID + "/camera/images/" + timestamp + ".jpg";
+      DEBUGF("Enviando foto para Storage: %s\n", remotePath.c_str());
       if (Firebase.Storage.upload(&fbdo,
-                                  STORAGE_BUCKET_ID,    // bucket
-                                  localPath,            // caminho local
+                                  STORAGE_BUCKET_ID,    
+                                  localPath,            
                                   mem_storage_type_flash,
-                                  remotePath.c_str(),   // caminho no Storage
-                                  "image/jpeg",         // mime
-                                  fcsUploadCallback     // callback opcional
+                                  remotePath.c_str(),   
+                                  "image/jpeg",         
+                                  fcsUploadCallback     
                                  )) {
         DEBUGF("✅ [%d] Upload Storage: %s\n", contador, remotePath.c_str());
-        String url = fbdo.downloadURL();  // pega URL pública
-        // 3) envia metadados ao RTDB
-        String dbPath = "/users/" + userUID + "/camera/cameraData/" + String(timestamp);
+        String url = fbdo.downloadURL(); 
+
+        MB_String dbPath = MB_String("/users/") + userUID + "/camera/cameraData/" + timestamp;
         FirebaseJson json;
         json.set("timestamp", timestamp);
         json.set("url", url);
         json.set("contador", contador);
-        // …
         Firebase.RTDB.setJSON(&fbdo, dbPath, &json);
       } else {
-        DEBUG("❌ Erro Storage: " + fbdo.errorReason());
+       DEBUGF("Erro Storage: %s\n", fbdo.errorReason().c_str());
       }
 
       // 4) cleanup
