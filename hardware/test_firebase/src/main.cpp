@@ -56,6 +56,12 @@ void initCamera() {
   config.jpeg_quality = 12;
   config.fb_count = 1;
 
+  #if CONFIG_IDF_TARGET_ESP32
+  #define TARGET_ESP32CAM
+  #elif CONFIG_IDF_TARGET_ESP32S3
+    #define TARGET_ESP32S3
+  #endif
+
   if (!psramFound()) {
   DEBUG("PSRAM não detectada!");
   } else {
