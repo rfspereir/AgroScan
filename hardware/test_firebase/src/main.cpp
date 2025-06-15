@@ -7,16 +7,11 @@
 #include "config.h"  // WIFI_SSID, WIFI_PASSWORD, API_KEY, DATABASE_URL
 #include "camera_pins.h" // Camera pins for ESP32-CAM OR ESP32-S3-CAM
 #include <esp_camera.h>
+#include <LittleFS.h> 
 
 #define DEBUG_MODE true  // Altere para false para desativar debug
 #define DEBUG(x) do { if (DEBUG_MODE) Serial.println(x); } while (0)
 #define DEBUGF(...) do { if (DEBUG_MODE) Serial.printf(__VA_ARGS__); } while (0)
-
-#if CONFIG_IDF_TARGET_ESP32
-  #define TARGET_ESP32CAM
-#elif CONFIG_IDF_TARGET_ESP32S3
-  #define TARGET_ESP32S3
-#endif
 
 ESP32Time rtc(0);
 FirebaseData fbdo;
@@ -33,7 +28,7 @@ SemaphoreHandle_t xSemaphore;
 #define EV_WIFI (1 << 1)
 #define EV_FIRE (1 << 2)
 
-QueueHandle_t queueContador = xQueueCreate(1, sizeof(int));
+QueueHandle_t queueContador = xQueueCreate(8, sizeof(int));
 
 void initCamera() {
   camera_config_t config;
@@ -57,14 +52,14 @@ void initCamera() {
   config.pin_reset = CAM_PIN_RESET;
   config.xclk_freq_hz = 20000000;
   config.pixel_format = PIXFORMAT_JPEG;
-  config.frame_size = FRAMESIZE_QVGA;
+  config.frame_size = FRAMESIZE_UXGA;
   config.jpeg_quality = 12;
   config.fb_count = 1;
 
   if (!psramFound()) {
-  DEBUG("⚠️ PSRAM não detectada!");
+  DEBUG("PSRAM não detectada!");
   } else {
-    DEBUG("✅ PSRAM detectada.");
+    DEBUG("PSRAM detectada.");
   }
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK) {
@@ -103,6 +98,7 @@ void conectarFirebase(void *pvParameters) {
 
     Firebase.signUp(&config, &auth, "", "");
     Firebase.begin(&config, &auth);
+    LittleFS.begin();   
     Firebase.reconnectWiFi(true);
 
     unsigned long timeout = millis();
@@ -123,49 +119,86 @@ void conectarFirebase(void *pvParameters) {
   vTaskDelete(NULL);
 }
 
+// The Firebase Storage upload callback function
+void fcsUploadCallback(FCS_UploadStatusInfo info)
+{
+    if (info.status == firebase_fcs_upload_status_init)
+    {
+        Serial.printf("Uploading file %s (%d) to %s\n", info.localFileName.c_str(), info.fileSize, info.remoteFileName.c_str());
+    }
+    else if (info.status == firebase_fcs_upload_status_upload)
+    {
+        Serial.printf("Uploaded %d%s, Elapsed time %d ms\n", (int)info.progress, "%", info.elapsedTime);
+    }
+    else if (info.status == firebase_fcs_upload_status_complete)
+    {
+        Serial.println("Upload completed\n");
+        FileMetaInfo meta = fbdo.metaData();
+        Serial.printf("Name: %s\n", meta.name.c_str());
+        Serial.printf("Bucket: %s\n", meta.bucket.c_str());
+        Serial.printf("contentType: %s\n", meta.contentType.c_str());
+        Serial.printf("Size: %d\n", meta.size);
+        Serial.printf("Generation: %lu\n", meta.generation);
+        Serial.printf("Metageneration: %lu\n", meta.metageneration);
+        Serial.printf("ETag: %s\n", meta.etag.c_str());
+        Serial.printf("CRC32: %s\n", meta.crc32.c_str());
+        Serial.printf("Tokens: %s\n", meta.downloadTokens.c_str());
+        Serial.printf("Download URL: %s\n\n", fbdo.downloadURL().c_str());
+    }
+    else if (info.status == firebase_fcs_upload_status_error)
+    {
+        Serial.printf("Upload failed, %s\n", info.errorMsg.c_str());
+    }
+}
+
 void enviarDadosFirebaseComFoto(void *pvParameters) {
   int contador = 0;
-
   for (;;) {
     if (signupOK && xSemaphoreTake(xSemaphore, pdMS_TO_TICKS(100)) == pdTRUE) {
       contador++;
       struct tm timeinfo = rtc.getTimeStruct();
       char timestamp[30];
       strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", &timeinfo);
-
       camera_fb_t *fb = esp_camera_fb_get();
-      if (!fb) {
-        DEBUG("Falha ao capturar imagem");
-        xSemaphoreGive(xSemaphore);
-        vTaskDelay(pdMS_TO_TICKS(100000));
-        continue;
+      if (!fb) { DEBUG("Falha na captura"); goto wait; }
+
+      // 1) salva buffer em arquivo temporário
+      const char *localPath = "/cap.jpg";
+      File f = LittleFS.open(localPath, FILE_WRITE);
+      f.write(fb->buf, fb->len);
+      f.close();
+
+      // 2) faz upload ao Storage
+      String remotePath =
+        "/users/" + userUID + "/camera/images/" + String(timestamp) + ".jpg";
+      if (Firebase.Storage.upload(&fbdo,
+                                  STORAGE_BUCKET_ID,    // bucket
+                                  localPath,            // caminho local
+                                  mem_storage_type_flash,
+                                  remotePath.c_str(),   // caminho no Storage
+                                  "image/jpeg",         // mime
+                                  fcsUploadCallback     // callback opcional
+                                 )) {
+        DEBUGF("✅ [%d] Upload Storage: %s\n", contador, remotePath.c_str());
+        String url = fbdo.downloadURL();  // pega URL pública
+        // 3) envia metadados ao RTDB
+        String dbPath = "/users/" + userUID + "/camera/cameraData/" + String(timestamp);
+        FirebaseJson json;
+        json.set("timestamp", timestamp);
+        json.set("url", url);
+        json.set("contador", contador);
+        // …
+        Firebase.RTDB.setJSON(&fbdo, dbPath, &json);
+      } else {
+        DEBUG("❌ Erro Storage: " + fbdo.errorReason());
       }
 
-      String path = "/users/" + userUID + "/camera/images/" + String(timestamp);
-      if (Firebase.RTDB.setBlob(&fbdo, path, fb->buf, fb->len)) {
-        DEBUGF("📷 [%d] Imagem enviada com sucesso: %s\n", contador, path.c_str());
-      } else {
-        DEBUG("Erro ao enviar imagem: " + fbdo.errorReason());
-      }
+      // 4) cleanup
+      LittleFS.remove(localPath);
       esp_camera_fb_return(fb);
-
-      String dbPath = "/users/" + userUID + "/camera/cameraData/" + String(timestamp);
-      FirebaseJson json;
-      json.set("timestamp", timestamp);
-      json.set("url", "CAMERA_RTDATABASE_BLOB");
-      json.set("temperature", "N/A");
-      json.set("humidity", "N/A");
-      json.set("contador", contador);
-      json.set("simulado", false);
-
-      if (Firebase.RTDB.setJSON(&fbdo, dbPath, &json)) {
-        DEBUGF("📤 [%d] Metadados enviados com sucesso: %s\n", contador, dbPath.c_str());
-      } else {
-        DEBUG("Erro ao enviar JSON: " + fbdo.errorReason());
-      }
-
-      xSemaphoreGive(xSemaphore);
     }
+wait:
+    xSemaphoreGive(xSemaphore);
     vTaskDelay(pdMS_TO_TICKS(10000));
   }
 }
