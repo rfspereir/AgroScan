@@ -1,1 +1,68 @@
-<p>usuarios works!</p>
+<app-topbar></app-topbar>
+
+<div class="usuarios">
+  <h1>Gerenciamento de Usuários</h1>
+
+  <div class="add-usuario">
+    <input [(ngModel)]="novoUsuarioNome" placeholder="Nome do usuário" />
+    <input [(ngModel)]="novoUsuarioEmail" placeholder="E-mail do usuário" />
+    <select [(ngModel)]="novoUsuarioRole">
+      <option value="admin_cliente">Admin Cliente</option>
+      <option value="tecnico">Técnico</option>
+      <option value="operador">Operador</option>
+    </select>
+    <button (click)="adicionarUsuario()">Adicionar Usuário</button>
+  </div>
+
+  <div *ngIf="usuarios.length === 0">
+    <p>Nenhum usuário cadastrado.</p>
+  </div>
+
+  <table *ngIf="usuarios.length > 0">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Nome</th>
+        <th>E-mail</th>
+        <th>Permissão</th>
+        <th>Ações</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let usuario of usuarios">
+        <td>{{ usuario.id }}</td>
+        <td>
+          <div *ngIf="!usuario.editando">
+            {{ usuario.nome }}
+            <button (click)="habilitarEdicao(usuario)">Editar</button>
+          </div>
+          <div *ngIf="usuario.editando">
+            <input [(ngModel)]="usuario.novoNome" />
+          </div>
+        </td>
+        <td>{{ usuario.email }}</td>
+        <td>
+          <div *ngIf="!usuario.editando">
+            {{ usuario.role }}
+          </div>
+          <div *ngIf="usuario.editando">
+            <select [(ngModel)]="usuario.novoRole">
+              <option value="admin_cliente">Admin Cliente</option>
+              <option value="tecnico">Técnico</option>
+              <option value="operador">Operador</option>
+            </select>
+          </div>
+        </td>
+        <td>
+          <div *ngIf="!usuario.editando">
+            <button class="danger" (click)="removerUsuario(usuario.id)">Remover</button>
+          </div>
+          <div *ngIf="usuario.editando">
+            <button (click)="editarUsuario(usuario)">Salvar</button>
+            <button class="secondary" (click)="cancelarEdicao(usuario)">Cancelar</button>
+          </div>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>

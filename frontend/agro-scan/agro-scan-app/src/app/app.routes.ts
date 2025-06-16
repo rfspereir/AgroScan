@@ -14,8 +14,14 @@ export const routes: Routes = [
       )
   },
   {
-  path: 'clientes',
-  loadComponent: () =>
-    import('./pages/clientes/clientes').then((m) => m.Clientes)
-}
+    path: 'clientes',
+    loadComponent: () =>
+      import('./pages/clientes/clientes').then((m) => m.Clientes)
+  },
+  {
+    path: 'usuarios',
+    loadComponent: () =>
+      import('./pages/usuarios/usuarios').then((m) => m.Usuarios)
+  }
+
 ];
