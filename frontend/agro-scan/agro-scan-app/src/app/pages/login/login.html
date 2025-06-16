@@ -1,0 +1,31 @@
+<div class="login-container">
+  <h2>AgroScan — Login</h2>
+
+  <form (submit)="login(); $event.preventDefault()">
+    <label for="email">E-mail</label>
+    <input
+      id="email"
+      type="email"
+      [(ngModel)]="email"
+      name="email"
+      required
+      placeholder="Digite seu e-mail"
+    />
+
+    <label for="password">Senha</label>
+    <input
+      id="password"
+      type="password"
+      [(ngModel)]="password"
+      name="password"
+      required
+      placeholder="Digite sua senha"
+    />
+
+    <button type="submit">Entrar</button>
+  </form>
+
+  <div class="error" *ngIf="errorMessage">
+    {{ errorMessage }}
+  </div>
+</div>
