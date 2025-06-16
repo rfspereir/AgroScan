@@ -1,11 +1,9 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 
 import { Auth, signInWithEmailAndPassword } from '@angular/fire/auth';
-
-import { FormsModule } from '@angular/forms';
-
 
 @Component({
   selector: 'app-login',
@@ -14,7 +12,7 @@ import { FormsModule } from '@angular/forms';
   templateUrl: './login.html',
   styleUrls: ['./login.css']
 })
-export class LoginComponent {
+export class Login {
   email = '';
   password = '';
   errorMessage = '';
@@ -24,10 +22,9 @@ export class LoginComponent {
   login() {
     this.errorMessage = '';
 
-    signInWithEmailAndPassword(this.auth, this.email, this.password)
+    signInWithEmailAndPassword(this.auth, this.email.trim(), this.password.trim())
       .then(() => {
-        // ✅ Login bem-sucedido
-        this.router.navigate(['/']); // ← ajustaremos isso para ir ao Dashboard futuramente
+        this.router.navigate(['/dashboard-root']);
       })
       .catch((error) => {
         console.error('Erro no login:', error);
