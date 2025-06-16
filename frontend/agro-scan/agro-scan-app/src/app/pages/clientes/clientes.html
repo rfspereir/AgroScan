@@ -1,0 +1,46 @@
+<app-topbar></app-topbar>
+
+<div class="clientes">
+  <h1>Gerenciamento de Clientes</h1>
+
+  <div class="add-cliente">
+    <input
+      [(ngModel)]="novoClienteNome"
+      placeholder="Nome do novo cliente"
+    />
+    <button (click)="adicionarCliente()">Adicionar Cliente</button>
+  </div>
+
+  <div *ngIf="clientes.length === 0">
+    <p>Nenhum cliente cadastrado.</p>
+  </div>
+
+  <table *ngIf="clientes.length > 0">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Nome</th>
+        <th>Ações</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let cliente of clientes">
+        <td>{{ cliente.id }}</td>
+        <td>{{ cliente.nome }}</td>
+        <td>
+        <td>
+            <div *ngIf="!cliente.editando">
+                {{ cliente.nome }}
+                <button (click)="habilitarEdicao(cliente)">Editar</button>
+            </div>
+            <div *ngIf="cliente.editando">
+                <input [(ngModel)]="cliente.novoNome" />
+                <button (click)="editarCliente(cliente)">Salvar</button>
+                <button class="secondary" (click)="cancelarEdicao(cliente)">Cancelar</button>
+            </div>
+          <button class="danger" (click)="removerCliente(cliente.id)">Remover</button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>

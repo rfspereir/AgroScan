@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { Topbar } from '../../shared/topbar/topbar';
 import { Database, ref, get, child } from '@angular/fire/database';
+import { Auth } from '@angular/fire/auth';
 
 @Component({
   selector: 'app-dashboard-root',
@@ -17,11 +18,30 @@ export class DashboardRoot implements OnInit {
   totalDispositivos = 0;
   dispositivosOffline = 0;
 
-  constructor(private db: Database) {}
+  constructor(private db: Database, private auth: Auth) {}
 
   ngOnInit(): void {
-    this.carregarDados();
-  }
+  this.carregarDados();
+}
+
+  // ngOnInit(): void {
+  //   this.verificarClaims();
+  //   this.carregarDados();
+  // }
+
+  // async verificarClaims() {
+  //   const user = await this.auth.currentUser;
+  //   if (user) {
+  //     const tokenResult = await user.getIdTokenResult(true);
+  //     console.log('Claims atuais:', tokenResult.claims);
+
+  //     if (tokenResult.claims['role'] !== 'root') {
+  //       console.warn('⚠️ Atenção: Este usuário não é root. As permissões podem estar incorretas.');
+  //     }
+  //   } else {
+  //     console.warn('Nenhum usuário autenticado.');
+  //   }
+  // }
 
   async carregarDados() {
     const dbRef = ref(this.db);
@@ -63,7 +83,7 @@ export class DashboardRoot implements OnInit {
         console.log('Nenhum cliente encontrado');
       }
     } catch (error) {
-      console.error('Erro ao carregar dados:', error);
+      console.error('Erro ao carregar clientes:', error);
     }
   }
 }

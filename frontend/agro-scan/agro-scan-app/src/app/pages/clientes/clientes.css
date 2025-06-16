@@ -1,0 +1,47 @@
+.clientes {
+  padding: 20px;
+}
+
+.clientes h1 {
+  margin-bottom: 24px;
+}
+
+.add-cliente {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.add-cliente input {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid var(--cor-cinza-medio);
+  border-radius: 4px;
+}
+
+.add-cliente button {
+  padding: 8px 16px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th, td {
+  text-align: left;
+  padding: 10px;
+  border-bottom: 1px solid var(--cor-cinza-medio);
+}
+
+th {
+  background-color: var(--cor-cinza-claro);
+}
+
+button.danger {
+  background-color: var(--cor-vermelho-claro);
+}
+
+button.danger:hover {
+  background-color: #c85656;
+}

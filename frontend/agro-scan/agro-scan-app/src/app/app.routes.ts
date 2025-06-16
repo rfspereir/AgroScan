@@ -12,5 +12,10 @@ export const routes: Routes = [
       import('./pages/dashboard-root/dashboard-root').then(
         (m) => m.DashboardRoot
       )
-  }
+  },
+  {
+  path: 'clientes',
+  loadComponent: () =>
+    import('./pages/clientes/clientes').then((m) => m.Clientes)
+}
 ];
