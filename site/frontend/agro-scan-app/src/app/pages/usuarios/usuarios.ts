@@ -113,12 +113,22 @@ export class Usuarios implements OnInit {
     }
   }
 
-  async removerUsuario(id: string) {
-    await remove(
-      ref(this.db, `clientes/${this.clienteSelecionado}/usuarios/${id}`)
-    );
-    this.carregarUsuarios();
+  async excluirUsuarioAuth(usuario: any) {
+    const deleteUser = httpsCallable(this.functions, 'deleteUser');
+
+    try {
+      await deleteUser({
+        uid: usuario.id,
+        clienteId: this.clienteSelecionado
+      });
+
+      console.log('Usuário excluído com sucesso');
+      this.carregarUsuarios();
+    } catch (error) {
+      console.error('Erro ao excluir usuário:', error);
+    }
   }
+
 
   async editarUsuario(usuario: any) {
     if (!usuario.novoNome.trim() || !usuario.novoRole.trim()) return;

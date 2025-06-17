@@ -63,7 +63,7 @@
         </td>
         <td>
           <div *ngIf="!usuario.editando">
-            <button class="danger" (click)="removerUsuario(usuario.id)">Remover</button>
+            <button class="danger" (click)="excluirUsuarioAuth(usuario)">Remover</button>
           </div>
           <div *ngIf="usuario.editando">
             <button (click)="editarUsuario(usuario)">Salvar</button>

@@ -37,3 +37,26 @@ export const createUser = onCall(async (request) => {
 
   return {uid: user.uid, message: "Usuário criado com sucesso."};
 });
+
+export const deleteUser = onCall(async (request) => {
+  const auth = request.auth;
+  const data = request.data;
+
+  if (auth?.token.role !== "root") {
+    throw new Error("Acesso negado. Apenas root pode excluir usuários.");
+  }
+
+  const {uid, clienteId} = data;
+
+  if (!uid || !clienteId) {
+    throw new Error("UID e clienteId são obrigatórios.");
+  }
+
+  // 🔥 Remove do Auth
+  await admin.auth().deleteUser(uid);
+
+  // 🔥 Remove do RTDB
+  await admin.database().ref(`clientes/${clienteId}/usuarios/${uid}`).remove();
+
+  return {message: "Usuário excluído com sucesso."};
+});
