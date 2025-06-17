@@ -2,8 +2,9 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { Topbar } from '../../shared/topbar/topbar';
-import { Database, ref, get, child, set, remove, push, update } from '@angular/fire/database';
+import { Database, ref, get, set, child, remove } from '@angular/fire/database';
 import { FormsModule } from '@angular/forms';
+import { Functions, httpsCallable } from '@angular/fire/functions';
 
 @Component({
   selector: 'app-usuarios',
@@ -14,22 +15,49 @@ import { FormsModule } from '@angular/forms';
 })
 export class Usuarios implements OnInit {
   usuarios: any[] = [];
+  clientes: any[] = [];
+  clienteSelecionado = '';
+
   novoUsuarioNome = '';
   novoUsuarioEmail = '';
   novoUsuarioRole = 'operador';
+  novaSenha = '';
 
-  clienteId = 'cliente_id_1'; // 🔥 ← Depois podemos pegar isso dinamicamente do auth
 
-  constructor(private db: Database) {}
+  constructor(private db: Database, private functions: Functions) {}
 
   ngOnInit(): void {
+    this.carregarClientes();
     this.carregarUsuarios();
   }
 
-  async carregarUsuarios() {
+  async carregarClientes() {
     const dbRef = ref(this.db);
     try {
-      const snapshot = await get(child(dbRef, `clientes/${this.clienteId}/usuarios`));
+      const snapshot = await get(child(dbRef, 'clientes'));
+      if (snapshot.exists()) {
+        const dados = snapshot.val();
+        this.clientes = Object.keys(dados).map((key) => ({
+          id: key,
+          nome: dados[key].nome
+        }));
+      }
+    } catch (error) {
+      console.error('Erro ao carregar clientes:', error);
+    }
+  }
+
+  async carregarUsuarios() {
+    if (!this.clienteSelecionado) {
+      this.usuarios = [];
+      return;
+    }
+
+    const dbRef = ref(this.db);
+    try {
+      const snapshot = await get(
+        child(dbRef, `clientes/${this.clienteSelecionado}/usuarios`)
+      );
       if (snapshot.exists()) {
         const dados = snapshot.val();
         this.usuarios = Object.keys(dados).map((key) => ({
@@ -44,24 +72,51 @@ export class Usuarios implements OnInit {
     }
   }
 
-  async adicionarUsuario() {
-    if (!this.novoUsuarioNome.trim() || !this.novoUsuarioEmail.trim()) return;
+  gerarSenha() {
+    const caracteres = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%&*';
+    this.novaSenha = Array.from({ length: 10 }, () =>
+      caracteres.charAt(Math.floor(Math.random() * caracteres.length))
+    ).join('');
+  }
 
-    const novoRef = push(ref(this.db, `clientes/${this.clienteId}/usuarios`));
-    await set(novoRef, {
-      nome: this.novoUsuarioNome.trim(),
+  async criarUsuarioAuth() {
+  if (
+    !this.novoUsuarioNome.trim() ||
+    !this.novoUsuarioEmail.trim() ||
+    !this.clienteSelecionado ||
+    !this.novaSenha.trim()
+  ) {
+    console.error('Todos os campos são obrigatórios');
+    return;
+  }
+
+  const createUser = httpsCallable(this.functions, 'createUser');
+
+  try {
+    const result = await createUser({
       email: this.novoUsuarioEmail.trim(),
+      password: this.novaSenha.trim(),
+      nome: this.novoUsuarioNome.trim(),
+      clienteId: this.clienteSelecionado,
       role: this.novoUsuarioRole
     });
+
+    console.log('Usuário criado com sucesso:', result);
 
     this.novoUsuarioNome = '';
     this.novoUsuarioEmail = '';
     this.novoUsuarioRole = 'operador';
+    this.novaSenha = '';
     this.carregarUsuarios();
+    } catch (error) {
+      console.error('Erro ao criar usuário:', error);
+    }
   }
 
   async removerUsuario(id: string) {
-    await remove(ref(this.db, `clientes/${this.clienteId}/usuarios/${id}`));
+    await remove(
+      ref(this.db, `clientes/${this.clienteSelecionado}/usuarios/${id}`)
+    );
     this.carregarUsuarios();
   }
 
@@ -73,7 +128,11 @@ export class Usuarios implements OnInit {
       role: usuario.novoRole.trim()
     };
 
-    await update(ref(this.db, `clientes/${this.clienteId}/usuarios/${usuario.id}`), atualizacao);
+    const dbRef = ref(
+      this.db,
+      `clientes/${this.clienteSelecionado}/usuarios/${usuario.id}`
+    );
+    await set(dbRef, atualizacao);
 
     usuario.editando = false;
     this.carregarUsuarios();

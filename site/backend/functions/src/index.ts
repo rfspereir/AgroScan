@@ -12,9 +12,9 @@ export const createUser = onCall(async (request) => {
     throw new Error("Acesso negado. Apenas root pode criar usuários.");
   }
 
-  const {email, password, nome, clienteid, role} = data;
+  const {email, password, nome, clienteId, role} = data;
 
-  if (!email || !password || !nome || !clienteid || !role) {
+  if (!email || !password || !nome || !clienteId || !role) {
     throw new Error("Campos obrigatórios ausentes.");
   }
 
@@ -25,12 +25,12 @@ export const createUser = onCall(async (request) => {
   });
 
   await admin.auth().setCustomUserClaims(user.uid, {
-    clienteid,
+    clienteId,
     role,
   });
 
   await admin.database()
-    .ref(`clientes/${clienteid}/usuarios/${user.uid}`)
+    .ref(`clientes/${clienteId}/usuarios/${user.uid}`)
     .set({nome, email, role});
 
   logger.info(`Usuário criado: ${user.uid}`);

@@ -4,14 +4,22 @@
   <h1>Gerenciamento de Usuários</h1>
 
   <div class="add-usuario">
+    <select [(ngModel)]="clienteSelecionado">
+      <option value="" disabled selected>Selecione o Cliente</option>
+      <option *ngFor="let cliente of clientes" [value]="cliente.id">
+        {{ cliente.nome }}
+      </option>
+    </select>
     <input [(ngModel)]="novoUsuarioNome" placeholder="Nome do usuário" />
     <input [(ngModel)]="novoUsuarioEmail" placeholder="E-mail do usuário" />
+    <input [(ngModel)]="novaSenha" placeholder="Senha do usuário" />
+    <button (click)="gerarSenha()">Gerar Senha Aleatória</button>
     <select [(ngModel)]="novoUsuarioRole">
       <option value="admin_cliente">Admin Cliente</option>
       <option value="tecnico">Técnico</option>
       <option value="operador">Operador</option>
     </select>
-    <button (click)="adicionarUsuario()">Adicionar Usuário</button>
+    <button (click)="criarUsuarioAuth()">Adicionar Usuário</button>
   </div>
 
   <div *ngIf="usuarios.length === 0">
