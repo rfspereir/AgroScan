@@ -130,23 +130,24 @@ export class Usuarios implements OnInit {
   }
 
 
-  async editarUsuario(usuario: any) {
-    if (!usuario.novoNome.trim() || !usuario.novoRole.trim()) return;
+  async editarUsuarioAuth(usuario: any) {
+  const editUser = httpsCallable(this.functions, 'editUser');
 
-    const atualizacao = {
+  try {
+    await editUser({
+      uid: usuario.id,
+      clienteId: this.clienteSelecionado,
       nome: usuario.novoNome.trim(),
       role: usuario.novoRole.trim()
-    };
+    });
 
-    const dbRef = ref(
-      this.db,
-      `clientes/${this.clienteSelecionado}/usuarios/${usuario.id}`
-    );
-    await set(dbRef, atualizacao);
-
+    console.log('Usuário atualizado com sucesso');
     usuario.editando = false;
     this.carregarUsuarios();
+  } catch (error) {
+    console.error('Erro ao editar usuário:', error);
   }
+}
 
   habilitarEdicao(usuario: any) {
     usuario.editando = true;

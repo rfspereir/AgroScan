@@ -60,3 +60,30 @@ export const deleteUser = onCall(async (request) => {
 
   return {message: "Usuário excluído com sucesso."};
 });
+
+export const editUser = onCall(async (request) => {
+  const auth = request.auth;
+  const data = request.data;
+
+  if (auth?.token.role !== "root") {
+    throw new Error("Acesso negado.");
+  }
+
+  const {uid, clienteId, nome, role} = data;
+
+  if (!uid || !clienteId || !nome || !role) {
+    throw new Error("Campos obrigatórios ausentes.");
+  }
+
+  // 🔧 Atualiza no RTDB
+  await admin.database().ref(`clientes/${clienteId}/usuarios/${uid}`).update({
+    nome,
+    role,
+  });
+
+  // 🔧 Atualiza displayName no Auth (opcional)
+  await admin.auth().updateUser(uid, {displayName: nome});
+
+  return {message: "Usuário atualizado com sucesso."};
+});
+

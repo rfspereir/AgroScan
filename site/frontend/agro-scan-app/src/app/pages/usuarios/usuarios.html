@@ -4,7 +4,7 @@
   <h1>Gerenciamento de Usuários</h1>
 
   <div class="add-usuario">
-    <select [(ngModel)]="clienteSelecionado">
+    <select [(ngModel)]="clienteSelecionado" (change)="carregarUsuarios()">
       <option value="" disabled selected>Selecione o Cliente</option>
       <option *ngFor="let cliente of clientes" [value]="cliente.id">
         {{ cliente.nome }}
@@ -66,7 +66,7 @@
             <button class="danger" (click)="excluirUsuarioAuth(usuario)">Remover</button>
           </div>
           <div *ngIf="usuario.editando">
-            <button (click)="editarUsuario(usuario)">Salvar</button>
+            <button (click)="editarUsuarioAuth(usuario)">Salvar</button>
             <button class="secondary" (click)="cancelarEdicao(usuario)">Cancelar</button>
           </div>
         </td>
