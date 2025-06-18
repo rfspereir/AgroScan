@@ -1,0 +1,11 @@
+{
+  "wifiSSID": "Galaxy Note1043b2",
+  "wifiPassword": "rsp@2029.wfUAI",  
+  "apiKey": "AIzaSyAjtADhlZbuAywwHgIU5X9HOsIAI8kRoyc",
+  "databaseURL": "https://agroscan-c8a09-default-rtdb.firebaseio.com",
+  "storageBucket": "agroscan-c8a09.appspot.com",
+  "clienteId": "-OSussmUgZtPQuX_7iPv",
+  "dispositivoUID": "-OT-ifwRaUQ9gaIESSud",
+  "sn": "1234567890",
+  "mac": "00-00-00-00-00"
+}
