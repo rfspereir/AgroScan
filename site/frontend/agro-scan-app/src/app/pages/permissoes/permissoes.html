@@ -1,0 +1,84 @@
+<app-topbar></app-topbar>
+
+<div class="permissoes">
+  <h1>Gerenciamento de Permissões</h1>
+
+  <div class="add-grupo">
+    <input [(ngModel)]="novoGrupoNome" placeholder="Nome do grupo" />
+    <input [(ngModel)]="novoGrupoDescricao" placeholder="Descrição" />
+
+    <div class="checkbox-group">
+        <label *ngFor="let perm of permissoesDisponiveis">
+        <input
+            type="checkbox"
+            [checked]="novoGrupoPermissoes.includes(perm)"
+            (change)="togglePermissao(perm, novoGrupoPermissoes)"
+        />
+        {{ perm }}
+        </label>
+    </div>
+
+    <button (click)="adicionarGrupo()">Adicionar Grupo</button>
+  </div>
+
+  <div *ngIf="grupos.length === 0">
+    <p>Nenhum grupo cadastrado.</p>
+  </div>
+
+  <table *ngIf="grupos.length > 0">
+    <thead>
+      <tr>
+        <th>Grupo</th>
+        <th>Descrição</th>
+        <th>Permissões</th>
+        <th>Ações</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let grupo of grupos">
+        <td>{{ grupo.id }}</td>
+
+        <td>
+          <div *ngIf="!grupo.editando">
+            {{ grupo.descricao }}
+            <button (click)="habilitarEdicao(grupo)">Editar</button>
+          </div>
+          <div *ngIf="grupo.editando">
+            <input [(ngModel)]="grupo.novoDescricao" />
+          </div>
+        </td>
+
+        <td>
+          <div *ngIf="!grupo.editando">
+            <ul>
+              <li *ngFor="let p of grupo.permissoes">{{ p }}</li>
+            </ul>
+          </div>
+          <div *ngIf="grupo.editando">
+            <div class="checkbox-group">
+                <label *ngFor="let perm of permissoesDisponiveis">
+                <input
+                    type="checkbox"
+                    [checked]="grupo.novoPermissoes.includes(perm)"
+                    (change)="togglePermissao(perm, grupo.novoPermissoes)"
+                />
+                {{ perm }}
+                </label>
+
+            </div>
+          </div>
+        </td>
+
+        <td>
+          <div *ngIf="!grupo.editando">
+            <button class="danger" (click)="removerGrupo(grupo.id)">Remover</button>
+          </div>
+          <div *ngIf="grupo.editando">
+            <button (click)="editarGrupo(grupo)">Salvar</button>
+            <button class="secondary" (click)="cancelarEdicao(grupo)">Cancelar</button>
+          </div>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>

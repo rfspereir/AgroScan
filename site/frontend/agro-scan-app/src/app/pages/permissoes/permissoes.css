@@ -1,0 +1,60 @@
+.permissoes {
+  padding: 20px;
+}
+
+.permissoes h1 {
+  margin-bottom: 24px;
+}
+
+.add-grupo {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.add-grupo input {
+  padding: 8px;
+  border: 1px solid var(--cor-cinza-medio);
+  border-radius: 4px;
+}
+
+.checkbox-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.checkbox-group label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+button {
+  padding: 8px 16px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 10px;
+  border-bottom: 1px solid var(--cor-cinza-medio);
+}
+
+th {
+  background-color: var(--cor-cinza-claro);
+}
+
+button.danger {
+  background-color: var(--cor-vermelho-claro);
+}
+
+button.danger:hover {
+  background-color: #c85656;
+}
