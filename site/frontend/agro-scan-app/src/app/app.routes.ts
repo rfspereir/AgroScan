@@ -23,7 +23,11 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./pages/usuarios/usuarios').then((m) => m.Usuarios)
   },
-  
+  {
+  path: 'dispositivos',
+  loadComponent: () =>
+    import('./pages/dispositivos/dispositivos').then((m) => m.Dispositivos)
+  },
   {
   path: 'permissoes',
   loadComponent: () =>
