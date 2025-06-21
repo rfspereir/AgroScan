@@ -25,7 +25,11 @@ export class Permissoes implements OnInit {
     'exportar_dados',
     'visualizar_logs',
     'configurar_alertas',
-    'administrar_sistema'
+    'administrar_sistema',
+    'enviar_dados',
+    'upload_fotos',
+    'consultar_configuracoes',
+    'consultar_comandos'
   ];
 
   grupos: any[] = [];

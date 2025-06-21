@@ -1,0 +1,41 @@
+<app-topbar></app-topbar>
+
+<div class="PreCadastroDisp">
+  <h1>Pré-Cadastro de Dispositivos</h1>
+
+  <div class="add-dispositivo">
+    <label>Cliente</label>
+    <select [(ngModel)]="clienteSelecionado" (change)="carregarDispositivos()">
+      <option value="" disabled selected>Selecione o Cliente</option>
+      <option *ngFor="let cliente of clientes" [value]="cliente.id">
+        {{ cliente.nome }}
+      </option>
+    </select>
+
+    <label>Número de Série (SN)</label>
+    <input [(ngModel)]="novoDispositivoSn" placeholder="Número de Série" />
+
+    <button (click)="adicionarDispositivo()">Adicionar Dispositivo</button>
+  </div>
+
+  <div *ngIf="dispositivos.length === 0">
+    <p>Nenhum dispositivo cadastrado.</p>
+  </div>
+
+  <table *ngIf="dispositivos.length > 0">
+    <thead>
+      <tr>
+        <th>UID</th>
+        <th>Ações</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let dispositivo of dispositivos">
+        <td>{{ dispositivo.id }}</td>
+        <td>
+          <button class="danger" (click)="removerDispositivo(dispositivo.id)">Remover</button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>

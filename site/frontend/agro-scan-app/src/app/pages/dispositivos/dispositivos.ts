@@ -2,9 +2,9 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { Topbar } from '../../shared/topbar/topbar';
-import { Database, ref, get, child, set, remove, update, push } from '@angular/fire/database';
+import { Database, ref, get, child, update} from '@angular/fire/database';
 import { FormsModule } from '@angular/forms';
-import { Html5Qrcode } from 'html5-qrcode';
+import { FirebaseFunctionsService } from '../../services/firebase-functions.service';
 
 @Component({
   selector: 'app-dispositivos',
@@ -18,16 +18,13 @@ export class Dispositivos implements OnInit {
   clientes: any[] = [];
   clienteSelecionado = '';
 
-  novoDispositivoId = '';
-  novoDispositivoMac = '';
   novoDispositivoNome = '';
   novoDispositivoDescricao = '';
 
-  constructor(private db: Database) {}
+  constructor(private db: Database, private functionsService: FirebaseFunctionsService) {}
 
   ngOnInit(): void {
     this.carregarClientes();
-    this.carregarDispositivos();
   }
 
   async carregarClientes() {
@@ -38,7 +35,7 @@ export class Dispositivos implements OnInit {
         const dados = snapshot.val();
         this.clientes = Object.keys(dados).map((key) => ({
           id: key,
-          nome: dados[key].nome
+          nome: dados[key].nome || key
         }));
       }
     } catch (error) {
@@ -61,7 +58,9 @@ export class Dispositivos implements OnInit {
         const dados = snapshot.val();
         this.dispositivos = Object.keys(dados).map((key) => ({
           id: key,
-          ...dados[key]
+          nome: dados[key].nome || '',
+          descricao: dados[key].descricao || '',
+          editando: false
         }));
       } else {
         this.dispositivos = [];
@@ -71,49 +70,32 @@ export class Dispositivos implements OnInit {
     }
   }
 
-  async adicionarDispositivo() {
-    if (
-      !this.novoDispositivoNome.trim() ||
-      !this.clienteSelecionado
-    )
-      return;
-
-    const dispositivoRef = push(ref(this.db, `clientes/${this.clienteSelecionado}/dispositivos`));
-
-    await set(dispositivoRef, {
-      sn: this.novoDispositivoId.trim() || '',
-      mac: this.novoDispositivoMac.trim() || '',
-      nome: this.novoDispositivoNome.trim(),
-      descricao: this.novoDispositivoDescricao.trim()
-    });
-
-    this.novoDispositivoId = '';
-    this.novoDispositivoMac = '';
-    this.novoDispositivoNome = '';
-    this.novoDispositivoDescricao = '';
-
-    this.carregarDispositivos();
-  }
-
   async removerDispositivo(id: string) {
-    await remove(
-      ref(this.db, `clientes/${this.clienteSelecionado}/dispositivos/${id}`)
-    );
-    this.carregarDispositivos();
-  }
+    const confirmacao = confirm(`Deseja realmente excluir o dispositivo ${id}?`);
+    if (!confirmacao) return;
+
+    try {
+      const result = await this.functionsService.deleteDevice(id);
+      console.log('Dispositivo removido:', result);
+      alert('Dispositivo removido com sucesso.');
+      await this.carregarDispositivos();
+    } catch (error) {
+      console.error('Erro ao remover dispositivo:', error);
+      alert('Erro ao remover dispositivo.');
+    }
+}
 
   async editarDispositivo(dispositivo: any) {
     if (
-      !dispositivo.novoNome.trim() ||
-      !dispositivo.novoDescricao.trim()
-    )
+      !dispositivo.novoNome.trim()
+    ) {
+      alert('Nome é obrigatório.');
       return;
+    }
 
     const atualizacao = {
-      sn: dispositivo.novoSn.trim() || '',
-      mac: dispositivo.novoMac.trim() || '',
       nome: dispositivo.novoNome.trim(),
-      descricao: dispositivo.novoDescricao.trim()
+      descricao: dispositivo.novoDescricao.trim() || ''
     };
 
     const dbRef = ref(
@@ -123,61 +105,16 @@ export class Dispositivos implements OnInit {
     await update(dbRef, atualizacao);
 
     dispositivo.editando = false;
-    this.carregarDispositivos();
+    await this.carregarDispositivos();
   }
 
   habilitarEdicao(dispositivo: any) {
     dispositivo.editando = true;
-    dispositivo.novoSn = dispositivo.sn || '';
-    dispositivo.novoMac = dispositivo.mac || '';
     dispositivo.novoNome = dispositivo.nome;
     dispositivo.novoDescricao = dispositivo.descricao;
   }
 
   cancelarEdicao(dispositivo: any) {
     dispositivo.editando = false;
-  }
-
-  lerQrCamera() {
-    const qrCodeScanner = new Html5Qrcode('scanner');
-
-    qrCodeScanner.start(
-      { facingMode: 'environment' },
-      { fps: 10, qrbox: 250 },
-      (decodedText) => {
-        console.log('QR lido:', decodedText);
-        this.preencherDadosDoQr(decodedText);
-        qrCodeScanner.stop();
-      },
-      (errorMessage) => {
-        console.warn('Erro:', errorMessage);
-      }
-    );
-  }
-
-  lerQrImagem(event: any) {
-    const file = event.target.files[0];
-    const qrCodeScanner = new Html5Qrcode('scanner');
-
-    qrCodeScanner.scanFile(file, true)
-      .then((decodedText) => {
-        console.log('QR lido:', decodedText);
-        this.preencherDadosDoQr(decodedText);
-      })
-      .catch(err => {
-        console.warn('Erro ao ler imagem:', err);
-      });
-  }
-
-  preencherDadosDoQr(decodedText: string) {
-    try {
-      const dados = JSON.parse(decodedText);
-      this.novoDispositivoId = dados.sn || '';
-      this.novoDispositivoMac = dados.mac || '';
-      this.novoDispositivoNome = dados.nome || '';
-      this.novoDispositivoDescricao = dados.descricao || '';
-    } catch {
-      this.novoDispositivoId = decodedText;
-    }
   }
 }

@@ -17,45 +17,20 @@
 </head>
 <body>
   <div class="card">
-    <h2>Configuração AgroScan</h2>
+    <h2>Configuração do Dispositivo AgroScan</h2>
 
     <form id="form">
-      <!-- Campos de configuração manual -->
       <label>Wi-Fi SSID</label>
       <input name="wifiSSID" placeholder="Nome da Rede Wi-Fi" required>
 
       <label>Wi-Fi Senha</label>
       <input name="wifiPassword" type="password" placeholder="Senha do Wi-Fi" required>
 
-      <label>API Key Firebase</label>
-      <input name="apiKey" placeholder="API Key do Firebase" required>
-
-      <label>Database URL</label>
-      <input name="databaseURL" placeholder="https://xxx.firebaseio.com" required>
-
-      <label>Storage Bucket</label>
-      <input name="storageBucket" placeholder="xxx.appspot.com" required>
-
-      <label>Cliente ID</label>
-      <input name="clienteId" placeholder="UID do Cliente no sistema" required>
-
-      <label>Dispositivo UID</label>
-      <input name="dispositivoUID" placeholder="UID do Dispositivo no sistema" required>
-
-      <label>Número de Série (SN)</label>
-      <input name="sn" placeholder="Número de Série (Opcional)">
-
-      <label>MAC Address</label>
-      <input name="mac" placeholder="MAC Address (Opcional)">
-
       <button type="submit">Salvar e Reiniciar</button>
     </form>
-
-    <hr>
-
-    <h3>Ou carregar um arquivo config.json pronto:</h3>
-    <input type="file" id="jsonFile" accept=".json" />
-    <button onclick="uploadJson()">Upload JSON e Reiniciar</button>
+    <p style="text-align:center; color:#666; font-size:14px;">
+    O dispositivo será vinculado automaticamente após conexão na internet.
+    </p>
   </div>
 
   <footer>
@@ -72,30 +47,11 @@
         body: JSON.stringify(data)
       });
       if (res.ok) {
-        alert('✅ Configuração salva! Reiniciando...');
+        alert('Configuração salva! Reiniciando...');
       } else {
-        alert('❌ Erro ao salvar configuração.');
+        alert('Erro ao salvar configuração.');
       }
     });
-
-    async function uploadJson() {
-      const fileInput = document.getElementById('jsonFile');
-      const file = fileInput.files[0];
-      if (!file) {
-        alert('Por favor, selecione um arquivo JSON.');
-        return;
-      }
-      const text = await file.text();
-      const res = await fetch('/save', {
-        method: 'POST',
-        body: text
-      });
-      if (res.ok) {
-        alert('✅ Configuração salva via JSON! Reiniciando...');
-      } else {
-        alert('❌ Erro ao salvar configuração via JSON.');
-      }
-    }
   </script>
 </body>
 </html>

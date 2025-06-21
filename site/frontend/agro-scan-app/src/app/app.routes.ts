@@ -24,6 +24,11 @@ export const routes: Routes = [
       import('./pages/usuarios/usuarios').then((m) => m.Usuarios)
   },
   {
+    path: 'PreCadastroDisp',
+    loadComponent: () =>
+      import('./pages/pre-cadastro-disp/pre-cadastro-disp').then((m) => m.PreCadastroDisp)
+  },
+  {
   path: 'dispositivos',
   loadComponent: () =>
     import('./pages/dispositivos/dispositivos').then((m) => m.Dispositivos)

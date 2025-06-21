@@ -9,27 +9,32 @@
 #include <ArduinoJson.h>
 #include <WebServer.h>
 #include <DNSServer.h>
+#include <WiFiClientSecure.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
 
-#include "camera_pins.h"
+#include <config.h>
+#include <camera_pins.h>
+#include <certificado.h>
 
 // Debug
 #define DEBUG_MODE true
 #define DEBUG(x) do { if (DEBUG_MODE) Serial.println(x); } while (0)
 #define DEBUGF(...) do { if (DEBUG_MODE) Serial.printf(__VA_ARGS__); } while (0)
+#define DEBUGL(x) do { if (DEBUG_MODE) Serial.print(x); } while (0)
 
 //Reset
 #define PIN_RESET 12
 
-// Firebase e Wi-Fi
+ESP32Time rtc(0);
 FirebaseData fbdo;
 FirebaseAuth auth;
 FirebaseConfig config;
-ESP32Time rtc(0);
-
-String WIFI_SSID, WIFI_PASSWORD, API_KEY, DATABASE_URL, STORAGE_BUCKET;
-String clienteId, dispositivoUID, sn, mac;
-
 bool signupOK = false;
+
+String WIFI_SSID, WIFI_PASSWORD;
+// String clienteId, dispositivoUID, email, senha, sn, mac;
+String clienteId, dispositivoUID, customToken, sn, mac;
 
 // Eventos e filas
 EventGroupHandle_t xEventGroupKey;
@@ -43,53 +48,23 @@ QueueHandle_t queueContador = xQueueCreate(8, sizeof(int));
 // ================== Reset Físico ==================
 
 void checarResetFisico() {
+  DEBUG("Checando reset físico...");
   pinMode(PIN_RESET, INPUT_PULLUP);
+  vTaskDelay(pdMS_TO_TICKS(1000));
   if (digitalRead(PIN_RESET) == LOW) {
     unsigned long tempo = millis();
     while (digitalRead(PIN_RESET) == LOW) {
       if (millis() - tempo > 5000) {  // 5 segundos segurando
-        DEBUG("🔧 Reset físico iniciado...");
+        DEBUG("Reset físico iniciado...");
         LittleFS.begin();
         LittleFS.remove("/config.json");
         DEBUG("Config apagado. Reiniciando...");
-        delay(1000);
+        vTaskDelay(pdMS_TO_TICKS(1000));
         ESP.restart();
       }
     }
   }
 }
-
-// ================== Reset Remoto ==================
-void checarResetRemoto() {
-  for (;;) {
-    if (signupOK) {
-      MB_String path = MB_String("/clientes/") + clienteId.c_str() + "/dispositivos/" + dispositivoUID.c_str() + "/comandos/reset";
-      bool reset = false;
-
-      if (Firebase.RTDB.getBool(&fbdo, path)) {
-        reset = fbdo.boolData();
-        if (reset) {
-          DEBUG("🔧 Reset remoto recebido...");
-
-          // Apaga o comando no RTDB
-          Firebase.RTDB.setBool(&fbdo, path, false);
-
-          // Apaga config
-          LittleFS.begin();
-          LittleFS.remove("/config.json");
-
-          DEBUG("Config apagado. Reiniciando...");
-          delay(1000);
-          ESP.restart();
-        }
-      } else {
-        DEBUGF("Erro lendo comando reset: %s\n", fbdo.errorReason().c_str());
-      }
-    }
-    vTaskDelay(pdMS_TO_TICKS(5000));  // Checa a cada 5 segundos
-  }
-}
-
 // ================== Leitura de configuração ==================
 
 void carregarConfig() {
@@ -117,26 +92,25 @@ void carregarConfig() {
 
   WIFI_SSID = doc["wifiSSID"].as<String>();
   WIFI_PASSWORD = doc["wifiPassword"].as<String>();
-  API_KEY = doc["apiKey"].as<String>();
-  DATABASE_URL = doc["databaseURL"].as<String>();
-  STORAGE_BUCKET = doc["storageBucket"].as<String>();
   clienteId = doc["clienteId"].as<String>();
   dispositivoUID = doc["dispositivoUID"].as<String>();
+  // email = doc["email"].as<String>();
+  // senha = doc["senha"].as<String>();
+  customToken = doc["customToken"].as<String>();
   sn = doc["sn"].as<String>();
   mac = doc["mac"].as<String>();
 
   DEBUGF("Config carregado: clienteId=%s, dispositivoUID=%s\n", clienteId.c_str(), dispositivoUID.c_str());
 }
 
-
-//================== Portal de cadastro do dispositivo para config. inicial ==================
+//================== Portal de config. inicial ==================
 
 WebServer server(80);
 DNSServer dnsServer;
 
 void startConfigPortal() {
   if (!LittleFS.begin()) {
-    Serial.println("❌ Falha ao montar LittleFS.");
+    DEBUG("Falha ao montar LittleFS.");
     return;
   }
 
@@ -144,7 +118,7 @@ void startConfigPortal() {
   WiFi.softAP("AgroScan-Setup");
 
   IPAddress IP = WiFi.softAPIP();
-  Serial.printf("🌐 AP IP address: %s\n", IP.toString().c_str());
+  DEBUGF("AP IP address: %s\n", IP.toString().c_str());
 
   dnsServer.start(53, "*", IP);
 
@@ -153,58 +127,156 @@ void startConfigPortal() {
       File file = LittleFS.open("/index.html", "r");
       server.streamFile(file, "text/html");
       file.close();
-      Serial.println("✅ Página index.html servida.");
+      DEBUG("Página index.html servida.");
     } else {
-      server.send(500, "text/plain", "❌ index.html não encontrado.");
-      Serial.println("❌ index.html não encontrado.");
+      server.send(500, "text/plain", "index.html não encontrado.");
+      DEBUG("index.html não encontrado.");
     }
   });
 
   server.on("/save", HTTP_POST, []() {
     if (!server.hasArg("plain")) {
-      server.send(400, "text/plain", "❌ Bad Request - Dados não recebidos.");
-      Serial.println("❌ Dados não recebidos.");
+      server.send(400, "text/plain", "Bad Request - Dados não recebidos.");
+      DEBUG("Dados não recebidos.");
       return;
     }
 
-    Serial.println("👉 Dados recebidos:");
-    Serial.println(server.arg("plain"));
+    DEBUG("Dados recebidos:");
+    DEBUG(server.arg("plain"));
 
     DynamicJsonDocument doc(1024);
     DeserializationError error = deserializeJson(doc, server.arg("plain"));
     if (error) {
-      server.send(400, "text/plain", "❌ JSON Parse Failed.");
-      Serial.print("❌ Erro JSON: ");
-      Serial.println(error.f_str());
+      server.send(400, "text/plain", "JSON Parse Failed.");
+      DEBUG("Erro JSON: ");
+      DEBUG(error.f_str());
       return;
     }
 
     File file = LittleFS.open("/config.json", "w");
     if (!file) {
-      server.send(500, "text/plain", "❌ Failed to open config.json.");
-      Serial.println("❌ Falha ao abrir config.json.");
+      server.send(500, "text/plain", "Failed to open config.json.");
+      DEBUG("Falha ao abrir config.json.");
       return;
     }
 
     serializeJson(doc, file);
     file.close();
 
-    server.send(200, "text/plain", "✅ Configuração salva.");
-    Serial.println("✅ Configuração salva. Reiniciando...");
-    delay(1000);
+    server.send(200, "text/plain", "Configuração salva.");
+    DEBUG("Configuração salva. Reiniciando...");
+    vTaskDelay(pdMS_TO_TICKS(1000));
     ESP.restart();
   });
 
   server.begin();
-  Serial.println("🚀 Servidor iniciado em http://192.168.4.1");
+  DEBUG("Servidor iniciado em http://192.168.4.1");
 }
 
-
 void taskWebServer(void *pvParameters) {
+  startConfigPortal();
+  vTaskDelay(pdMS_TO_TICKS(1000));
   while (true) {
     dnsServer.processNextRequest();
     server.handleClient();
     vTaskDelay(pdMS_TO_TICKS(10));
+  }
+}
+
+//=================== Provisionamento online============
+void provisionarDispositivo(void *pvParameters) {
+  EventBits_t bits = xEventGroupWaitBits(xEventGroupKey, EV_WIFI, pdFALSE, pdTRUE, portMAX_DELAY);
+  if (bits & EV_WIFI) {
+    WiFiClientSecure client;
+    client.setCACert(root_ca);
+
+    HTTPClient https;
+    String url = CREATE_DEVICE_URL;
+    https.begin(client, url);
+    https.addHeader("Content-Type", "application/json");
+
+    //Captura MAC e SN automaticamente
+    String mac = WiFi.macAddress();
+    uint64_t chipid = ESP.getEfuseMac();
+    String sn = String((uint16_t)(chipid >> 32), HEX) + String((uint32_t)chipid, HEX);
+    sn.toUpperCase();
+    sn.trim();
+    mac.replace(":", "");
+    mac.trim();
+
+    DEBUGF("SN: %s\n", sn.c_str());
+
+    // Monta o JSON
+    StaticJsonDocument<512> json;
+    json["sn"] = sn;
+    json["mac"] = mac;
+
+    String requestBody;
+    serializeJson(json, requestBody);
+
+    DEBUG("Enviando dados para backend...");
+    int httpCode = https.POST(requestBody);
+
+    if (httpCode > 0) {
+      String payload = https.getString();
+      DEBUG("Resposta do backend:");
+      DEBUG(payload);
+
+      if (httpCode == 200) {
+        StaticJsonDocument<512> response;
+        DeserializationError error = deserializeJson(response, payload);
+
+        if (error) {
+          DEBUG("Erro ao parsear resposta JSON");
+          https.end();
+          vTaskDelay(pdTICKS_TO_MS(2000));
+          ESP.restart();
+          vTaskDelete(NULL);
+        }
+
+        String dispositivoUID = response["uid"];
+        String clienteId = response["clienteId"];
+        String email = response["email"];
+        String customToken = response["customToken"];
+
+        // Salva no config.json
+        StaticJsonDocument<1024> config;
+        config["wifiSSID"] = WIFI_SSID;
+        config["wifiPassword"] = WIFI_PASSWORD;
+        config["clienteId"] = clienteId;
+        config["dispositivoUID"] = dispositivoUID;
+        // config["email"] = email;
+        // config["senha"] = senha;
+        config["customToken"] = customToken;
+        config["sn"] = sn;
+        config["mac"] = mac;
+
+        File file = LittleFS.open("/config.json", "w");
+        if (!file) {
+          DEBUG("Erro ao abrir config.json para escrita.");
+          https.end();
+          vTaskDelay(pdTICKS_TO_MS(2000));
+          ESP.restart();
+          vTaskDelete(NULL);
+        }
+        serializeJson(config, file);
+        file.close();
+
+        DEBUG("Provisionamento concluído com sucesso.");
+        https.end();
+        vTaskDelay(pdTICKS_TO_MS(2000));
+        ESP.restart();
+        vTaskDelete(NULL);
+      }
+    } else {
+      DEBUGF("Erro na requisição HTTPS: %s\n", https.errorToString(httpCode).c_str());
+    }
+
+    https.end();
+    vTaskDelay(pdTICKS_TO_MS(2000));
+    ESP.restart();
+    vTaskDelete(NULL);
+    return;
   }
 }
 
@@ -233,7 +305,7 @@ void initCamera() {
   config.pin_reset = CAM_PIN_RESET;
   config.xclk_freq_hz = 20000000;
   config.pixel_format = PIXFORMAT_JPEG;
-  config.frame_size = FRAMESIZE_SVGA;
+  config.frame_size = FRAMESIZE_QXGA;
   config.jpeg_quality = 12;
   config.fb_count = 1;
 
@@ -252,57 +324,53 @@ void initCamera() {
 // ================== Wi-Fi ==================
 
 void initWiFi(void *pvParameters) {
-  WiFi.begin(WIFI_SSID.c_str(), WIFI_PASSWORD.c_str());
-  DEBUG("Conectando ao Wi-Fi...");
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  DEBUGL("Conectando ao Wi-Fi...");
   while (WiFi.status() != WL_CONNECTED) {
-    DEBUG(".");
-    vTaskDelay(pdMS_TO_TICKS(500));
+    DEBUGL(".");
+    vTaskDelay(pdMS_TO_TICKS(2000));
   }
-  DEBUGF("\nConectado. IP: %s\n", WiFi.localIP().toString().c_str());
+  DEBUGF("\nConectado com IP: %s\n", WiFi.localIP().toString().c_str());
 
-  configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+  configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET_SEC, NTP_SERVER_1, NTP_SERVER_2, NTP_SERVER_3);
   struct tm timeinfo;
   if (getLocalTime(&timeinfo)) {
     rtc.setTimeStruct(timeinfo);
   }
-
+  DEBUGF("Hora atual: %s\n", rtc.getTime("%Y-%m-%d %H:%M:%S").c_str());
   xEventGroupSetBits(xEventGroupKey, EV_WIFI);
   vTaskDelete(NULL);
 }
-
 // ================== Firebase ==================
 
 void conectarFirebase(void *pvParameters) {
   EventBits_t bits = xEventGroupWaitBits(xEventGroupKey, EV_WIFI, pdFALSE, pdTRUE, portMAX_DELAY);
   if (bits & EV_WIFI) {
-    Serial.println("Conectando ao Firebase...");
+    DEBUG("Conectando ao Firebase...");
 
     config.api_key = API_KEY;
     config.database_url = DATABASE_URL;
-
-    Firebase.signUp(&config, &auth, "", "");
+       
     Firebase.begin(&config, &auth);
+    Firebase.setCustomToken(&config, customToken);   
     Firebase.reconnectWiFi(true);
-
-    unsigned long start = millis();
-    const unsigned long TIMEOUT = 15000; // 🔥 15 segundos máximo
-
-    while (auth.token.uid == "" && millis() - start < TIMEOUT) {
-      Serial.print(".");
+    unsigned long timeout = millis();
+    DEBUGL("Aguardando autenticação no Firebase...");
+    while (auth.token.uid == "" && millis() - timeout < 10000) {
+      DEBUGL(".");
       vTaskDelay(pdMS_TO_TICKS(200));
     }
 
     if (auth.token.uid != "") {
       signupOK = true;
-      Serial.printf("\n✅ Conectado no Firebase. UID: %s\n", auth.token.uid.c_str());
+      DEBUGF("\nConectado no Firebase com o UID: %s\n",auth.token.uid.c_str());
       xEventGroupSetBits(xEventGroupKey, EV_FIRE);
     } else {
-      Serial.println("\n❌ Falha ao conectar no Firebase. Verifique API Key, Database URL e rede.");
+      DEBUG("\nFalha ao conectar no Firebase. Verifique API Key, Database URL e rede.");
     }
   }
   vTaskDelete(NULL);
 }
-
 
 // ================== Upload Callback ==================
 
@@ -322,52 +390,57 @@ void fcsUploadCallback(FCS_UploadStatusInfo info) {
 // ================== Loop de envio ==================
 
 void enviarDadosFirebase(void *pvParameters) {
-  int contador = 0;
+  EventBits_t bits = xEventGroupWaitBits(xEventGroupKey, EV_FIRE, pdFALSE, pdTRUE, portMAX_DELAY);
+  if (bits & EV_FIRE) {
+    int contador = 0;
+    initCamera();
+    for (;;) {
+      if (Firebase.ready() && signupOK && xSemaphoreTake(xSemaphore, pdMS_TO_TICKS(100)) == pdTRUE) {
+        contador++;
+        DEBUGF("Contador: %d\n", contador);
 
-  for (;;) {
-    if (signupOK && xSemaphoreTake(xSemaphore, pdMS_TO_TICKS(100)) == pdTRUE) {
-      contador++;
+        struct tm timeinfo = rtc.getTimeStruct();
+        char timestamp[30];
+        strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", &timeinfo);
 
-      struct tm timeinfo = rtc.getTimeStruct();
-      char timestamp[30];
-      strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", &timeinfo);
+        camera_fb_t *fb = esp_camera_fb_get();
+        if (!fb) {
+          DEBUG(" Falha na captura");
+          xSemaphoreGive(xSemaphore);
+          vTaskDelay(pdMS_TO_TICKS(10000));
+          continue;
+        }
 
-      camera_fb_t *fb = esp_camera_fb_get();
-      if (!fb) {
-        DEBUG("❌ Falha na captura");
+        const char *localPath = "/cap.jpg";
+        File f = LittleFS.open(localPath, FILE_WRITE);
+        f.write(fb->buf, fb->len);
+        f.close();
+
+        MB_String remotePath = MB_String("/clientes/") + clienteId + "/dispositivos/" + dispositivoUID + "/fotos/" + timestamp + ".jpg";
+        DEBUGF("remotePath: %s\n", remotePath.c_str());
+        if (Firebase.Storage.upload(&fbdo, STORAGE_BUCKET, localPath, mem_storage_type_flash, remotePath.c_str(), "image/jpeg", fcsUploadCallback)) {
+          MB_String url = fbdo.downloadURL();
+          DEBUGF("url: %s\n", url.c_str());
+          MB_String dbPath = MB_String("/clientes/") + clienteId + "/dispositivos/" + dispositivoUID + "/dados/" + timestamp;
+          DEBUGF("dbPath: %s\n", url.c_str());
+          FirebaseJson json;
+          json.set("timestamp", timestamp);
+          json.set("url", url);
+          json.set("contador", contador);
+          json.set("sn", sn);
+          json.set("mac", mac);
+
+          Firebase.RTDB.setJSON(&fbdo, dbPath.c_str(), &json);
+        } else {
+          DEBUGF("Erro upload: %s\n", fbdo.errorReason().c_str());
+        }
+
+        LittleFS.remove(localPath);
+        esp_camera_fb_return(fb);
+
         xSemaphoreGive(xSemaphore);
-        vTaskDelay(pdMS_TO_TICKS(10000));
-        continue;
+        vTaskDelay(pdMS_TO_TICKS(1000));
       }
-
-      const char *localPath = "/cap.jpg";
-      File f = LittleFS.open(localPath, FILE_WRITE);
-      f.write(fb->buf, fb->len);
-      f.close();
-
-      String remotePath = String("/clientes/") + clienteId + "/dispositivos/" + dispositivoUID + "/fotos/" + timestamp + ".jpg";
-
-      if (Firebase.Storage.upload(&fbdo, STORAGE_BUCKET.c_str(), localPath, mem_storage_type_flash, remotePath.c_str(), "image/jpeg", fcsUploadCallback)) {
-        String url = fbdo.downloadURL();
-
-        String dbPath = String("/clientes/") + clienteId + "/dispositivos/" + dispositivoUID + "/dados/" + timestamp;
-        FirebaseJson json;
-        json.set("timestamp", timestamp);
-        json.set("url", url);
-        json.set("contador", contador);
-        json.set("sn", sn);
-        json.set("mac", mac);
-
-        Firebase.RTDB.setJSON(&fbdo, dbPath.c_str(), &json);
-      } else {
-        DEBUGF("❌ Erro upload: %s\n", fbdo.errorReason().c_str());
-      }
-
-      LittleFS.remove(localPath);
-      esp_camera_fb_return(fb);
-
-      xSemaphoreGive(xSemaphore);
-      vTaskDelay(pdMS_TO_TICKS(10000));
     }
   }
 }
@@ -377,36 +450,30 @@ void enviarDadosFirebase(void *pvParameters) {
 void setup() {
   Serial.begin(115200);
   delay(1000);
-  Serial.println("Iniciando...");
-
-  // checarResetFisico();
-  // checarResetRemoto();
-
-   if (!LittleFS.begin()) {
-    Serial.println("❌ Falha ao montar LittleFS.");
+  DEBUG("Iniciando...");
+  checarResetFisico();
+  if (!LittleFS.begin()) {
+    DEBUG(" Falha ao montar LittleFS.");
     return;
   }
-
-
   if (!LittleFS.exists("/config.json")) {
-    DEBUG("🔧 Configuração não encontrada. Iniciando Portal Wi-Fi...");
-    startConfigPortal();
-    xTaskCreate(taskWebServer, "taskWebServer", 4096, NULL, 1, NULL);
-    } else {//inicializa normalmente
-      DEBUG("🔧 Configuração encontrada. Iniciando sistema...");
+    DEBUG("Configuração não encontrada. Iniciando Portal Wi-Fi...");
+    xTaskCreate(taskWebServer, "taskWebServer", 8096, NULL, 1, NULL);
+    } else {
+      DEBUG("Configuração encontrada. Iniciando sistema...");
       carregarConfig();
-      initCamera();
       xEventGroupKey = xEventGroupCreate();
       xSemaphore = xSemaphoreCreateBinary();
       if (xSemaphore) xSemaphoreGive(xSemaphore);
-        xTaskCreate(initWiFi, "initWiFi", 5000, NULL, 14, NULL);
-        xTaskCreatePinnedToCore(conectarFirebase, "conectarFirebase", 5000, NULL, 14, NULL, 1);
-        // xTaskCreatePinnedToCore(enviarDadosFirebase, "enviarDadosFirebase", 8096, NULL, 1, NULL, 1);
+      xTaskCreate(initWiFi, "initWiFi", 4096, NULL, 14, NULL);
+      if (clienteId == "" || clienteId == "null" || dispositivoUID == "" || dispositivoUID == "null") {
+        DEBUG("Dados de provisionamento não encontrados. Executando provisionamento online...");
+        xTaskCreate(provisionarDispositivo, "provisionarDispositivo", 8096, NULL, 14, NULL);
+      }else{
+        xTaskCreate(conectarFirebase, "conectarFirebase", 8096, NULL, 14, NULL);
+        xTaskCreate(enviarDadosFirebase, "enviarDadosFirebase", 30400, NULL, 1, NULL);
       }
-
-  
-}
-
+    }
+  }
 void loop() {
-  // vazio
 }

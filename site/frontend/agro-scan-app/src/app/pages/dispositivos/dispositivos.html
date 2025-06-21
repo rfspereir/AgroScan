@@ -1,30 +1,16 @@
 <app-topbar></app-topbar>
 
 <div class="dispositivos">
-  <h1>Gerenciamento de Dispositivos</h1>
+  <h1>Edição de Dispositivos Cadastrados</h1>
 
   <div class="add-dispositivo">
+    <label>Cliente</label>
     <select [(ngModel)]="clienteSelecionado" (change)="carregarDispositivos()">
       <option value="" disabled selected>Selecione o Cliente</option>
       <option *ngFor="let cliente of clientes" [value]="cliente.id">
         {{ cliente.nome }}
       </option>
     </select>
-
-    <input [(ngModel)]="novoDispositivoId" placeholder="Número de Série (SN)" />
-    <input [(ngModel)]="novoDispositivoMac" placeholder="MAC Address" />
-    <input [(ngModel)]="novoDispositivoNome" placeholder="Nome do dispositivo" />
-    <input [(ngModel)]="novoDispositivoDescricao" placeholder="Descrição" />
-
-    <div class="scanner-actions">
-      <button (click)="lerQrCamera()">Ler QR (Câmera)</button>
-      <input type="file" accept="image/*" (change)="lerQrImagem($event)" />
-    </div>
-
-    <div id="scanner"></div>
-
-    <button (click)="adicionarDispositivo()">Adicionar Dispositivo</button>
-  </div>
 
   <div *ngIf="dispositivos.length === 0">
     <p>Nenhum dispositivo cadastrado.</p>
@@ -34,35 +20,12 @@
     <thead>
       <tr>
         <th>UID</th>
-        <th>SN</th>
-        <th>MAC</th>
-        <th>Nome</th>
-        <th>Descrição</th>
         <th>Ações</th>
       </tr>
     </thead>
     <tbody>
       <tr *ngFor="let dispositivo of dispositivos">
         <td>{{ dispositivo.id }}</td>
-
-        <td>
-          <div *ngIf="!dispositivo.editando">
-            {{ dispositivo.sn }}
-          </div>
-          <div *ngIf="dispositivo.editando">
-            <input [(ngModel)]="dispositivo.novoSn" />
-          </div>
-        </td>
-
-        <td>
-          <div *ngIf="!dispositivo.editando">
-            {{ dispositivo.mac }}
-          </div>
-          <div *ngIf="dispositivo.editando">
-            <input [(ngModel)]="dispositivo.novoMac" />
-          </div>
-        </td>
-
         <td>
           <div *ngIf="!dispositivo.editando">
             {{ dispositivo.nome }}

@@ -1,4 +1,3 @@
-/* 🌱 Estilo Global AgroScan */
 
 :root {
   --cor-verde-escuro: #1b5e20;
@@ -21,7 +20,6 @@ body {
   color: var(--cor-preto);
 }
 
-/* 🔝 Topbar */
 .topbar {
   background-color: var(--cor-verde-escuro);
   color: white;
@@ -47,7 +45,6 @@ body {
   text-decoration: underline;
 }
 
-/* 🏗️ Cards */
 .cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -101,7 +98,6 @@ button.secondary:hover {
   background-color: #4292d3;
 }
 
-/* 🚥 Status */
 .status {
   display: inline-block;
   width: 10px;

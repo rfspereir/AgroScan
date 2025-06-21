@@ -1,10 +1,6 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-// Wi-Fi
-#define WIFI_SSID "504"
-#define WIFI_PASSWORD "LS457190"
-
 // NTP Servers
 #define NTP_SERVER_1 "a.st1.ntp.br"
 #define NTP_SERVER_2 "time.nist.gov"
@@ -16,9 +12,7 @@
 #define API_KEY "AIzaSyAJtADhlZbuAywvHgIU5X9HOslAI8kRoyc"
 #define DATABASE_URL "https://agroscan-c8a09-default-rtdb.firebaseio.com"
 #define PROJECT_ID "agroscan-c8a09"
-#define STORAGE_BUCKET_ID "agroscan-c8a09.firebasestorage.app"
-
-// #define USER_EMAIL "proactive@proactive.com"
-// #define USER_PASSWORD "Proactive@2024"
+#define STORAGE_BUCKET "agroscan-c8a09.firebasestorage.app"
+#define CREATE_DEVICE_URL "https://createdevicev2-5is4ontjcq-uc.a.run.app"
 
 #endif
