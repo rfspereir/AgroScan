@@ -330,7 +330,7 @@ void enviarDadosFirebase(void *pvParameters) {
         DEBUGF("remotePath: %s\n", remotePath.c_str());
 
         bool uploadSuccess = uploadToFirebaseStorage(STORAGE_BUCKET, remotePath, localPath, idToken);
-
+        
         if (uploadSuccess) {
           String dbPath = String("clientes/") + clienteId + "/dispositivos/" + dispositivoUID + "/dados/" + timestamp;
           

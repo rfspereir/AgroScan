@@ -179,54 +179,73 @@ inline bool refreshIdToken(const String &apiKey, String &refreshToken, String &i
 // ================= Upload para Firebase Storage =================
 
 inline bool uploadToFirebaseStorage(const String &bucket, const String &remotePath, const String &localFilePath, const String &idToken) {
-  WiFiClientSecure client;
-  client.setCACert(CA_BUNDLE);
+    WiFiClientSecure client;
+    client.setCACert(CA_BUNDLE);
 
-  String url = String("https://firebasestorage.googleapis.com/v0/b/") + bucket + "/o?name=" + remotePath;
-  String authHeader = String("Bearer ") + String(idToken);
-  HTTPClient https;
-  https.begin(client, url);
-  https.addHeader("Authorization", authHeader);
-  https.addHeader("Content-Type", "image/jpeg");
-  https.setTimeout(10000); 
+    const char* host = "firebasestorage.googleapis.com";
+    const int httpsPort = 443;
 
+    if (!client.connect(host, httpsPort)) {
+        DEBUG("Falha na conexão com o Firebase Storage");
+        return false;
+    }
 
+    File file = LittleFS.open(localFilePath, "r");
+    if (!file) {
+        DEBUG("Falha ao abrir o arquivo para upload");
+        client.stop();
+        return false;
+    }
 
-  DEBUGF("Abrindo arquivo...: %s\n", localFilePath.c_str());
-  File file = LittleFS.open(localFilePath, "r");
-  if (!file) {
-    DEBUG("Falha ao abrir arquivo para upload.");
-    https.end();
-    return false;
-  }
-  
-  int tamanho = file.size();
-  uint8_t *buffer = (uint8_t *)malloc(tamanho);
-  if (!buffer) {
-    DEBUG("Falha ao alocar buffer.");
+    size_t fileSize = file.size();
+    DEBUGF("Arquivo aberto. Tamanho: %d bytes\n", fileSize);
+
+    String url = "/v0/b/" + bucket + "/o?name=" + remotePath + "&uploadType=media";
+
+    String header = String("POST ") + url + " HTTP/1.1\r\n" +
+                    "Host: " + host + "\r\n" +
+                    "Authorization: Bearer " + idToken + "\r\n" +
+                    "Content-Type: image/jpeg\r\n" +
+                    "Content-Length: " + String(fileSize) + "\r\n" +
+                    "Connection: close\r\n\r\n";
+
+    client.print(header);
+
+    // Upload em chunks
+    const size_t chunkSize = 4096;
+    uint8_t buffer[chunkSize];
+    size_t sent = 0;
+    client.setNoDelay(true);
+
+    while (file.available()) {
+        size_t len = file.readBytes((char *)buffer, chunkSize);
+        client.write(buffer, len);
+        sent += len;
+        float progress = (sent * 100.0) / fileSize;
+        DEBUGF("Upload: %.2f%%\n", progress);
+    }
+
     file.close();
-    https.end();
-    return false;
-  }
+    DEBUG("Upload enviado. Aguardando resposta...");
 
-  file.read(buffer, tamanho);
-  file.close();
-  DEBUG("Iniciando upload...");
-  int httpResponseCode = https.sendRequest("POST", buffer, tamanho);
-  free(buffer);
+    // Ler resposta HTTP
+    while (client.connected()) {
+        String line = client.readStringUntil('\n');
+        if (line == "\r") break;
+    }
 
-  if (httpResponseCode > 0) {
-    String response = https.getString();
-    // DEBUG("Resposta Storage:");
-    // DEBUG(response);
-    DEBUG("upload concluído com sucesso.");
-    https.end();
+    String payload = client.readString();
+    DEBUG("Resposta Storage:");
+    DEBUG(payload);
+
+    client.stop();
+
+    if (payload.indexOf("\"error\"") != -1) {
+        DEBUG("Erro no upload detectado.");
+        return false;
+    }
+
     return true;
-  } else {
-    DEBUGF("Erro upload: %s\n", https.errorToString(httpResponseCode));
-    https.end();
-    return false;
-  }
 }
 
 // ================= Gravação no Realtime Database =================
