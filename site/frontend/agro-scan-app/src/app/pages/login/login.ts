@@ -2,8 +2,7 @@ import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-
-import { Auth, signInWithEmailAndPassword } from '@angular/fire/auth';
+import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-login',
@@ -15,20 +14,29 @@ import { Auth, signInWithEmailAndPassword } from '@angular/fire/auth';
 export class Login {
   email = '';
   password = '';
+  loading = false;
   errorMessage = '';
 
-  constructor(private auth: Auth, private router: Router) {}
+  constructor(public authService: AuthService, private router: Router) {}
 
-  login() {
+  ngOnInit(): void {
+  if (this.authService.isLoggedIn()) {
+    this.authService.loadCustomClaims();
+  }
+  }
+
+  async login() {
+    this.loading = true;
     this.errorMessage = '';
 
-    signInWithEmailAndPassword(this.auth, this.email.trim(), this.password.trim())
-      .then(() => {
-        this.router.navigate(['/dashboard-root']);
-      })
-      .catch((error) => {
-        console.error('Erro no login:', error);
-        this.errorMessage = 'E-mail ou senha inválidos.';
-      });
+    try {
+      await this.authService.login(this.email.trim(), this.password.trim());
+      this.router.navigate(['/dashboard-root']);
+    } catch (error) {
+      console.error('Erro no login:', error);
+      this.errorMessage = 'E-mail ou senha inválidos.';
+    }
+
+    this.loading = false;
   }
 }

@@ -3,14 +3,15 @@
 <div class="dashboard">
   <h1>Visão Geral do Sistema</h1>
 
+  <!-- Cartões de dados gerais -->
   <div class="cards">
-    <div class="card">
+    <div class="card" *ngIf="auth.getRole() === 'root'">
       <h2>Total de Clientes</h2>
       <p>{{ totalClientes }}</p>
     </div>
 
     <div class="card">
-      <h2>Total de Dispositivos</h2>
+      <h2>Total de Dispositivos Provisionados</h2>
       <p>{{ totalDispositivos }}</p>
     </div>
 
@@ -20,8 +21,28 @@
     </div>
 
     <div class="card">
-      <h2>Dispositivos Offline</h2>
-      <p>{{ dispositivosOffline }}</p>
+      <h2>Total de Dispositivos
+        Pré-cadastrados</h2>
+      <p>{{ totalDispositivosPre }}</p>
+    </div>
+  </div>
+
+  <!-- Filtros de período -->
+  <div *ngIf="auth.getRole() !== 'root'">
+    <h2>Filtros de Período</h2>
+
+    <label for="inicio">Data Início:</label>
+    <input type="date" id="inicio" [(ngModel)]="periodoInicio" (change)="definirPeriodo(periodoInicio, periodoFim)" />
+
+    <label for="fim">Data Fim:</label>
+    <input type="date" id="fim" [(ngModel)]="periodoFim" (change)="definirPeriodo(periodoInicio, periodoFim)" />
+  </div>
+
+  <!-- Exibindo o gráfico -->
+  <div *ngIf="auth.getRole() !== 'root'">
+    <h2>Gráfico de Dispositivos</h2>
+    <div style="display: block;">
+      <canvas id="myChart"></canvas>
     </div>
   </div>
 </div>

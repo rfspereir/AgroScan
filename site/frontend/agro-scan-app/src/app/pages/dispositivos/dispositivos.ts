@@ -5,6 +5,7 @@ import { Topbar } from '../../shared/topbar/topbar';
 import { Database, ref, get, child, update} from '@angular/fire/database';
 import { FormsModule } from '@angular/forms';
 import { FirebaseFunctionsService } from '../../services/firebase-functions.service';
+import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-dispositivos',
@@ -21,13 +22,20 @@ export class Dispositivos implements OnInit {
   novoDispositivoNome = '';
   novoDispositivoDescricao = '';
 
-  constructor(private db: Database, private functionsService: FirebaseFunctionsService) {}
+  constructor(private db: Database, private functionsService: FirebaseFunctionsService, public auth: AuthService) {}
 
   ngOnInit(): void {
-    this.carregarClientes();
+    const role = this.auth.getRole();
+    const clienteId = this.auth.getClienteId();
+    if (role === 'root') {
+      this.carregarTodosClientes();
+  } else {
+      this.clienteSelecionado = clienteId || '';
+      this.carregarDispositivos();
+  }
   }
 
-  async carregarClientes() {
+  async carregarTodosClientes() {
     const dbRef = ref(this.db);
     try {
       const snapshot = await get(child(dbRef, 'clientes'));

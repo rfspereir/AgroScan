@@ -5,6 +5,8 @@ import { Topbar } from '../../shared/topbar/topbar';
 import { Database, ref, get, set, child, remove } from '@angular/fire/database';
 import { FormsModule } from '@angular/forms';
 import { Functions, httpsCallable } from '@angular/fire/functions';
+import { AuthService } from '../../services/auth.service';
+
 
 @Component({
   selector: 'app-usuarios',
@@ -23,15 +25,20 @@ export class Usuarios implements OnInit {
   novoUsuarioRole = 'operador';
   novaSenha = '';
 
+  constructor(private db: Database, private functions: Functions, public auth: AuthService) {}
 
-  constructor(private db: Database, private functions: Functions) {}
+ngOnInit(): void {
+  const role = this.auth.getRole();
+  const clienteId = this.auth.getClienteId();
 
-  ngOnInit(): void {
-    this.carregarClientes();
+  if (role === 'root') {
+    this.carregarTodosClientes();
+  } else {
+    this.clienteSelecionado = clienteId || '';
     this.carregarUsuarios();
   }
-
-  async carregarClientes() {
+}
+  async carregarTodosClientes() {
     const dbRef = ref(this.db);
     try {
       const snapshot = await get(child(dbRef, 'clientes'));
@@ -69,12 +76,13 @@ export class Usuarios implements OnInit {
       }
     } catch (error) {
       console.error('Erro ao carregar usuários:', error);
+      console.error('this.clienteSelecionado:', this.clienteSelecionado);
     }
   }
 
   gerarSenha() {
     const caracteres = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%&*';
-    this.novaSenha = Array.from({ length: 10 }, () =>
+    this.novaSenha = Array.from({ length: 12 }, () =>
       caracteres.charAt(Math.floor(Math.random() * caracteres.length))
     ).join('');
   }
@@ -157,5 +165,9 @@ export class Usuarios implements OnInit {
 
   cancelarEdicao(usuario: any) {
     usuario.editando = false;
+  }
+
+  onNomeChange() {
+    this.gerarSenha();
   }
 }

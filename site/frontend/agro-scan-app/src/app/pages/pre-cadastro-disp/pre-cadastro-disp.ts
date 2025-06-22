@@ -4,6 +4,7 @@ import { RouterModule } from '@angular/router';
 import { Topbar } from '../../shared/topbar/topbar';
 import { Database, ref, get, child, set, remove} from '@angular/fire/database';
 import { FormsModule } from '@angular/forms';
+import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-pre-cadastro-disp',
@@ -18,13 +19,20 @@ export class PreCadastroDisp implements OnInit {
   clienteSelecionado = '';
   novoDispositivoSn = '';
 
-  constructor(private db: Database) {}
+  constructor(private db: Database, public auth: AuthService) {}
 
   ngOnInit(): void {
-    this.carregarClientes();
+    const role = this.auth.getRole();
+    const clienteId = this.auth.getClienteId();
+    if (role === 'root') {
+      this.carregarTodosClientes();
+  } else {
+      this.clienteSelecionado = clienteId || '';
+      this.carregarDispositivos();
+  }
   }
 
-  async carregarClientes() {
+  async carregarTodosClientes() {
     const dbRef = ref(this.db);
     try {
       const snapshot = await get(child(dbRef, 'clientes'));

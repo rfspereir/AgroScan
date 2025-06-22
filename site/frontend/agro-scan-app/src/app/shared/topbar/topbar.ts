@@ -2,6 +2,7 @@ import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router } from '@angular/router';
 import { Auth, signOut } from '@angular/fire/auth';
+import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-topbar',
@@ -11,10 +12,10 @@ import { Auth, signOut } from '@angular/fire/auth';
   styleUrls: ['./topbar.css']
 })
 export class Topbar {
-  constructor(private auth: Auth, private router: Router) {}
+  constructor(private auths: Auth, private router: Router, public auth: AuthService) {}
 
   logout() {
-    signOut(this.auth).then(() => {
+    signOut(this.auths).then(() => {
       this.router.navigate(['/']);
     });
   }

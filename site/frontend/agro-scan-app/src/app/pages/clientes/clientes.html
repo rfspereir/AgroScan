@@ -28,9 +28,7 @@
         <td>{{ cliente.id }}</td>
         <td>{{ cliente.nome }}</td>
         <td>
-        <td>
             <div *ngIf="!cliente.editando">
-                {{ cliente.nome }}
                 <button (click)="habilitarEdicao(cliente)">Editar</button>
             </div>
             <div *ngIf="cliente.editando">

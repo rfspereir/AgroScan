@@ -338,8 +338,6 @@ void enviarDadosFirebase(void *pvParameters) {
           json["timestamp"] = String(timestamp).c_str();
           json["path"] = remotePath.c_str();
           json["contador"] = String(contador).c_str();
-          // json["sn"] = sn.c_str();
-          // json["mac"] = mac.c_str();
 
           writeToFirebaseRTDB(DATABASE_URL, dbPath, idToken, json);
         } else {

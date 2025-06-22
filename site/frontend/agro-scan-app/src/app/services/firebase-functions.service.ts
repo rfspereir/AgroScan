@@ -7,7 +7,6 @@ import { firstValueFrom } from 'rxjs';
 })
 export class FirebaseFunctionsService {
 
-  // 🔥 Substitua pela URL da sua função deleteDevice (Cloud Run ou HTTPS Firebase Function)
   private deleteDeviceUrl = 'https://deletedevice-5is4ontjcq-uc.a.run.app';
 
   constructor(private http: HttpClient) {}
@@ -22,8 +21,6 @@ export class FirebaseFunctionsService {
 
     const headers = new HttpHeaders({
       'Content-Type': 'application/json'
-      // Se você tiver autenticação, adicione aqui:
-      // 'Authorization': `Bearer ${token}`
     });
 
     return await firstValueFrom(

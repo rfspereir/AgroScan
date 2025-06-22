@@ -4,9 +4,8 @@
   <h1>Pré-Cadastro de Dispositivos</h1>
 
   <div class="add-dispositivo">
-    <label>Cliente</label>
-    <select [(ngModel)]="clienteSelecionado" (change)="carregarDispositivos()">
-      <option value="" disabled selected>Selecione o Cliente</option>
+    <select *ngIf="auth.getRole() === 'root'"[(ngModel)]="clienteSelecionado" (change)="carregarDispositivos()">
+      <option value="" selected>Selecione o Cliente</option>
       <option *ngFor="let cliente of clientes" [value]="cliente.id">
         {{ cliente.nome }}
       </option>

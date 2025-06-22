@@ -2,18 +2,16 @@
 
 <div class="usuarios">
   <h1>Gerenciamento de Usuários</h1>
-
   <div class="add-usuario">
-    <select [(ngModel)]="clienteSelecionado" (change)="carregarUsuarios()">
-      <option value="" disabled selected>Selecione o Cliente</option>
+    <select *ngIf="auth.getRole() === 'root'"[(ngModel)]="clienteSelecionado"(change)="carregarUsuarios()">
+      <option value="" selected>Selecione o Cliente</option>
       <option *ngFor="let cliente of clientes" [value]="cliente.id">
         {{ cliente.nome }}
       </option>
     </select>
-    <input [(ngModel)]="novoUsuarioNome" placeholder="Nome do usuário" />
+    <input [(ngModel)]="novoUsuarioNome" placeholder="Nome do usuário"(blur)="onNomeChange()" />
     <input [(ngModel)]="novoUsuarioEmail" placeholder="E-mail do usuário" />
-    <input [(ngModel)]="novaSenha" placeholder="Senha do usuário" />
-    <button (click)="gerarSenha()">Gerar Senha Aleatória</button>
+    <input [(ngModel)]="novaSenha" placeholder="Senha gerada automaticamente" [value]="novaSenha" />
     <select [(ngModel)]="novoUsuarioRole">
       <option value="admin_cliente">Admin Cliente</option>
       <option value="tecnico">Técnico</option>
@@ -42,7 +40,6 @@
         <td>
           <div *ngIf="!usuario.editando">
             {{ usuario.nome }}
-            <button (click)="habilitarEdicao(usuario)">Editar</button>
           </div>
           <div *ngIf="usuario.editando">
             <input [(ngModel)]="usuario.novoNome" />
@@ -63,6 +60,7 @@
         </td>
         <td>
           <div *ngIf="!usuario.editando">
+            <button (click)="habilitarEdicao(usuario)">Editar</button>
             <button class="danger" (click)="excluirUsuarioAuth(usuario)">Remover</button>
           </div>
           <div *ngIf="usuario.editando">

@@ -4,9 +4,8 @@
   <h1>Edição de Dispositivos Cadastrados</h1>
 
   <div class="add-dispositivo">
-    <label>Cliente</label>
-    <select [(ngModel)]="clienteSelecionado" (change)="carregarDispositivos()">
-      <option value="" disabled selected>Selecione o Cliente</option>
+    <select *ngIf="auth.getRole() === 'root'"[(ngModel)]="clienteSelecionado" (change)="carregarDispositivos()">
+      <option value="" selected>Selecione o Cliente</option>
       <option *ngFor="let cliente of clientes" [value]="cliente.id">
         {{ cliente.nome }}
       </option>
@@ -20,6 +19,8 @@
     <thead>
       <tr>
         <th>UID</th>
+        <th>Nome</th>
+        <th>Descrição</th>
         <th>Ações</th>
       </tr>
     </thead>
@@ -29,13 +30,11 @@
         <td>
           <div *ngIf="!dispositivo.editando">
             {{ dispositivo.nome }}
-            <button (click)="habilitarEdicao(dispositivo)">Editar</button>
-          </div>
+            </div>
           <div *ngIf="dispositivo.editando">
             <input [(ngModel)]="dispositivo.novoNome" />
           </div>
         </td>
-
         <td>
           <div *ngIf="!dispositivo.editando">
             {{ dispositivo.descricao }}
@@ -43,10 +42,9 @@
           <div *ngIf="dispositivo.editando">
             <input [(ngModel)]="dispositivo.novoDescricao" />
           </div>
-        </td>
-
-        <td>
+          <td>
           <div *ngIf="!dispositivo.editando">
+            <button (click)="habilitarEdicao(dispositivo)">Editar</button>
             <button class="danger" (click)="removerDispositivo(dispositivo.id)">Remover</button>
           </div>
           <div *ngIf="dispositivo.editando">
