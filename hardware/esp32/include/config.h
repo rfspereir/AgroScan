@@ -1,6 +1,12 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+// Debug
+#define DEBUG_MODE true
+#define DEBUG(x) do { if (DEBUG_MODE) Serial.println(x); } while (0)
+#define DEBUGF(...) do { if (DEBUG_MODE) Serial.printf(__VA_ARGS__); } while (0)
+#define DEBUGL(x) do { if (DEBUG_MODE) Serial.print(x); } while (0)
+
 // NTP Servers
 #define NTP_SERVER_1 "a.st1.ntp.br"
 #define NTP_SERVER_2 "time.nist.gov"

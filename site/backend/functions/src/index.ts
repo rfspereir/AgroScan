@@ -194,14 +194,13 @@ export const createDeviceV2 = functions.https.onRequest(async (req, res) => {
     await admin.database().ref(`mapaSn/${dispositivoId}`).remove();
 
     // Gera o custom token
-    const customToken = await admin.auth().createCustomToken(dispositivoId);
+    // const customToken = await admin.auth().createCustomToken(dispositivoId);
 
     res.status(200).send({
       uid: dispositivoId,
-      clienteId,
-      // email,
-      // senhaGerada,
-      customToken,
+      clienteId: clienteId,
+      email: email,
+      senha: senhaGerada,
       message: "Dispositivo criado com sucesso.",
     });
   } catch (error) {

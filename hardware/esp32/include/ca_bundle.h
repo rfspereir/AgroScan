@@ -1,7 +1,7 @@
-#ifndef CERTIFICADO_H
-#define CERTIFICADO_H
+#ifndef CA_BUNDLE_H
+#define CA_BUNDLE_H
 
-const char* root_ca = \
+const char *CA_BUNDLE = \
 "-----BEGIN CERTIFICATE-----\n" \
 "MIIFCzCCAvOgAwIBAgIQf/AFoHxM3tEArZ1mpRB7mDANBgkqhkiG9w0BAQsFADBH\n" \
 "MQswCQYDVQQGEwJVUzEiMCAGA1UEChMZR29vZ2xlIFRydXN0IFNlcnZpY2VzIExM\n" \
@@ -33,3 +33,4 @@ const char* root_ca = \
 "-----END CERTIFICATE-----\n";
 
 #endif
+

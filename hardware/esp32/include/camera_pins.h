@@ -19,6 +19,10 @@
   #define CAM_PIN_HREF    23
   #define CAM_PIN_PCLK    22
 
+  //outros pinos
+  //Reset
+  #define PIN_RESET       12
+
 #elif defined(CONFIG_TARGET_ESP32S3)
   // GOOUUU Tech ESP32-S3-CAM (40 pinos, 16MB flash, 8MB PSRAM)
   #define CAM_PIN_PWDN    -1
@@ -38,6 +42,10 @@
   #define CAM_PIN_VSYNC   6
   #define CAM_PIN_HREF    7
   #define CAM_PIN_PCLK    13
+
+  //outros pinos
+  //Reset
+  #define PIN_RESET       12
 
 #else
   #error "Nenhum alvo de câmera definido. Use -D CONFIG_TARGET_ESP32CAM ou -D CONFIG_TARGET_ESP32S3CAM"
