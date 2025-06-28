@@ -1,56 +1,68 @@
-<app-topbar></app-topbar>
+<app-topbar
+  [totalClientes]="totalClientes"
+  [totalDispositivos]="totalDispositivos"
+  [totalUsuarios]="totalUsuarios"
+  [totalDispositivosPre]="totalDispositivosPre">
+</app-topbar>
 
 <div class="dashboard">
-  <h1>Visão Geral do Sistema</h1>
 
-  <!-- Cartões de dados gerais -->
-  <div class="cards">
-    <div class="card" *ngIf="auth.getRole() === 'root'">
-      <h2>Total de Clientes</h2>
-      <p>{{ totalClientes }}</p>
-    </div>
+  <!-- Seletor de dispositivo -->
+  <div *ngIf="auth.getRole() !== 'root' && dispositivos.length > 0" class="filtro-dispositivo">
+    <label for="seletorDispositivo">Selecionar Dispositivo:</label>
+    <select [(ngModel)]="dispositivoSelecionado" (change)="onDispositivoChange()">
+      <option [value]="''"[defaultSelected]="">Selecione o dispositivo</option>
+      <option *ngFor="let disp of dispositivos" [value]="disp.uid">{{ disp.nome || disp.uid }}</option>
+    </select>
+  </div>
 
-    <div class="card">
-      <h2>Total de Dispositivos Provisionados</h2>
-      <p>{{ totalDispositivos }}</p>
-    </div>
+  <div class="dashboard-layout" *ngIf="auth.getRole() !== 'root' && dispositivoSelecionado">
+  
+  <!-- Coluna 1: Galeria -->
+  <div class="coluna-galeria" *ngIf="fotosCapturadas.length > 0">
+    <div class="galeria-container">
+      <div class="miniaturas">
+        <img *ngFor="let foto of fotosCapturadas.slice(-6); let i = index"
+            [src]="foto.url"
+            alt="Foto {{ i + 1 }}"
+            [class.selecionada]="i === fotoSelecionada"
+            (click)="fotoSelecionada = i" />
+      </div>
 
-    <div class="card">
-      <h2>Total de Usuários</h2>
-      <p>{{ totalUsuarios }}</p>
-    </div>
+      <div class="foto-principal">
+        <img [src]="fotosCapturadas.slice(-6)[fotoSelecionada]?.url" alt="Foto selecionada" />
+      </div>
 
-    <div class="card">
-      <h2>Total de Dispositivos
-        Pré-cadastrados</h2>
-      <p>{{ totalDispositivosPre }}</p>
+      <table class="tabela-info" *ngIf="fotosCapturadas.slice(-6)[fotoSelecionada]?.dados">
+        <tr>
+          <th>Timestamp</th>
+          <td>{{ fotosCapturadas.slice(-6)[fotoSelecionada].dados.timestamp || 'N/A' }}</td>
+        </tr>
+        <tr>
+          <th>Temperatura</th>
+          <td>{{ fotosCapturadas.slice(-6)[fotoSelecionada].dados.temperatura || 'N/A' }} °C</td>
+        </tr>
+        <tr>
+          <th>Umidade</th>
+          <td>{{ fotosCapturadas.slice(-6)[fotoSelecionada].dados.umidade | number:'1.2-2' }} %</td>
+        </tr>
+        <tr>
+          <th>Classe</th>
+          <td>{{ fotosCapturadas.slice(-6)[fotoSelecionada].dados.resultado.class || 'N/A' }}</td>
+        </tr>
+        <tr>
+          <th>Confiança</th>
+          <td>{{ fotosCapturadas.slice(-6)[fotoSelecionada].dados.resultado.confidence | number:'1.2-2' }} %</td>
+        </tr>
+      </table>
+
     </div>
   </div>
 
-  <!-- Filtros de período
-  <div *ngIf="auth.getRole() !== 'root'">
-    <h2>Filtros de Período</h2>
-
-    <label for="inicio">Data Início:</label>
-    <input type="date" id="inicio" [(ngModel)]="periodoInicio" (change)="definirPeriodo(periodoInicio, periodoFim)" />
-
-    <label for="fim">Data Fim:</label>
-    <input type="date" id="fim" [(ngModel)]="periodoFim" (change)="definirPeriodo(periodoInicio, periodoFim)" />
-  </div> -->
-
-  <!-- Exibindo o gráfico -->
-  <div *ngIf="auth.getRole() !== 'root'">
-    <h2>Gráfico de Dispositivos</h2>
-    <div style="display: block;">
-      <canvas id="myChart"></canvas>
-    </div>
+  <!-- Coluna 2: Gráfico -->
+  <div class="coluna-grafico">
+    <h2>Gráfico do Dispositivo</h2>
+    <canvas id="graficoDispositivo" width="400" height="200"></canvas>
   </div>
 
-  <!-- Galeria de fotos capturadas pelo ESP32 -->
-<div *ngIf="fotosCapturadas.length > 0">
-  <h3>Fotos Capturadas:</h3>
-  <div *ngFor="let foto of fotosCapturadas">
-    <img [src]="foto.url" alt="Foto do dispositivo" width="200" height="150"/>
-  </div>
 </div>
-

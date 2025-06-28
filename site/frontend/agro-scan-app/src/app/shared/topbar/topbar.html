@@ -1,5 +1,28 @@
 <div class="topbar">
   <div class="logo">AgroScan</div>
+
+  <!-- Cartões de dados gerais -->
+  <div class="topbar-cards">
+    <div class="card" *ngIf="auth.getRole() === 'root'">
+      <h2>Clientes</h2>
+      <p>{{ totalClientes }}</p>
+    </div>
+
+    <div class="card">
+      <h2>Disp. Provis.</h2>
+      <p>{{ totalDispositivos }}</p>
+    </div>
+
+    <div class="card">
+      <h2>Usuários</h2>
+      <p>{{ totalUsuarios }}</p>
+    </div>
+
+    <div class="card">
+      <h2>Disp. Pré-cadas.</h2>
+      <p>{{ totalDispositivosPre }}</p>
+    </div>
+  </div>
   
   <nav>
   <!-- Link para o Dashboard (mostra para todos os usuários) -->

@@ -31,15 +31,14 @@ export class AuthService {
   }
 
   async login(email: string, password: string) {
-    return signInWithEmailAndPassword(this.auth, email, password)
-      .then(async (userCredential) => {
-        await setPersistence(this.auth, browserLocalPersistence);
-        console.log('Login bem-sucedido!', userCredential);
-      })
-      .catch((error) => {
-        console.error('Erro no login:', error);
-      });
-  }
+     try {
+      await setPersistence(this.auth, browserLocalPersistence);  // Primeiro define persistência
+      const userCredential = await signInWithEmailAndPassword(this.auth, email, password);
+      console.log('Login bem-sucedido!', userCredential);
+    } catch (error) {
+      console.error('Erro no login:', error);
+    }
+}
 
   async logout() {
     await signOut(this.auth);

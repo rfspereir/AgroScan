@@ -5,8 +5,8 @@ import { Topbar } from '../../shared/topbar/topbar';
 import { Database, ref, get, child } from '@angular/fire/database';
 import { AuthService } from '../../services/auth.service';
 import { FormsModule } from '@angular/forms';
-import { Chart } from 'chart.js';  // Importando Chart.js
-import { getStorage, ref as storageRef, getDownloadURL, listAll } from '@angular/fire/storage';
+import { Chart } from 'chart.js/auto';
+import { getStorage, ref as storageRef, getDownloadURL, listAll, getMetadata} from '@angular/fire/storage';
 
 @Component({
   selector: 'app-dashboard-root',
@@ -26,42 +26,22 @@ export class DashboardRoot implements OnInit {
   dispositivoSelecionado: string = '';
   totalDispositivosPre = 0;
   fotosCapturadas: any[] = [];
-  
-  // Dados para o gráfico
-  public lineChartData: any;
-  public lineChartOptions: any = {
-    responsive: true,
-    scales: {
-      x: {
-        title: {
-          display: true,
-          text: 'Ano'
-        }
-      },
-      y: {
-        title: {
-          display: true,
-          text: '%'
-        },
-        min: 60,
-        max: 100
-      }
-    }
-  };
-
-  public lineChartType: string = 'line';  // Tipo de gráfico (linha)
+  dispositivos: any[] = [];
+  fotoSelecionada: number = 0;
+  limiteFotos: number = 7;
+  grafico!: Chart;
+  imagemSelecionada: any = null;
+  dadosImagemSelecionada: any = null;
+  lineChartData: any;
 
   constructor(private db: Database, public auth: AuthService) {}
 
   ngOnInit(): void {
     if (this.auth.getRole() !== 'root') {
-      this.carregarFotos();
       this.carregarDados();
-      this.createChart(); 
-    }
-    if (this.auth.getRole() === 'root') {
+      this.carregarListaDispositivos();
+    } else {
       this.carregarDados();
-      
     }
   }
 
@@ -72,7 +52,6 @@ export class DashboardRoot implements OnInit {
 
     try {
       if (role === 'root') {
-        // Carregar todos os clientes para usuários root
         const snapshot = await get(child(dbRef, 'clientes'));
         if (snapshot.exists()) {
           const clientes = snapshot.val();
@@ -80,14 +59,9 @@ export class DashboardRoot implements OnInit {
           this.totalClientes = clienteIds.length;
           this.contabilizarDados(clientes, clienteIds);
           this.carregarDispositivosPre();
-          
         }
       } else {
-        // Carregar apenas o cliente logado
-        if (!clienteId) {
-          console.error('clienteId não encontrado!');
-          return;
-        }
+        if (!clienteId) return;
         const snapshot = await get(child(dbRef, `clientes/${clienteId}`));
         if (snapshot.exists()) {
           const cliente = snapshot.val();
@@ -96,46 +70,113 @@ export class DashboardRoot implements OnInit {
           this.carregarDispositivosPre();
         }
       }
+      console.log('Valores enviados ao Topbar:', {
+      totalClientes: this.totalClientes,
+      totalDispositivos: this.totalDispositivos,
+      totalUsuarios: this.totalUsuarios,
+      totalDispositivosPre: this.totalDispositivosPre
+    });
+
     } catch (error) {
       console.error('Erro ao carregar dados do dashboard:', error);
     }
   }
 
+  async carregarListaDispositivos() {
+    const dbRef = ref(this.db);
+    try {
+      const snapshot = await get(child(dbRef, `clientes/${this.auth.getClienteId()}/dispositivos`));
+      if (snapshot.exists()) {
+        const dados = snapshot.val();
+        this.dispositivos = Object.keys(dados).map((key) => ({ uid: key, ...dados[key] }));
+        this.dispositivoSelecionado = this.dispositivos[0]?.uid;
+      }
+    } catch (error) {
+      console.error('Erro ao buscar dispositivos:', error);
+    }
+  }
+
+  onDispositivoChange() {
+    this.carregarFotosPorDispositivo(this.dispositivoSelecionado);
+    this.carregarDadosGraficoPorDispositivo(this.dispositivoSelecionado);
+  }
+
+  parseTimestampToDate(timestamp: string): Date | null {
+    if (!timestamp || timestamp.length < 15) return null;
+    const year = +timestamp.slice(0, 4);
+    const month = +timestamp.slice(4, 6) - 1;
+    const day = +timestamp.slice(6, 8);
+    const hour = +timestamp.slice(9, 11);
+    const minute = +timestamp.slice(11, 13);
+    const second = +timestamp.slice(13, 15);
+    return new Date(year, month, day, hour, minute, second);
+  }
+
+  async carregarFotosPorDispositivo(dispositivoId: string) {
+    
+    const storage = getStorage();
+    const clienteId = this.auth.getClienteId();
+    const dbRef = ref(this.db);
+
+    this.fotosCapturadas = [];
+    this.fotoSelecionada = 0;
+
+    if (!dispositivoId) {
+      console.warn('Dispositivo não selecionado');
+    return;
+    }
+    
+    try {
+      const fotosRef = storageRef(storage, `clientes/${clienteId}/dispositivos/${dispositivoId}/fotos`);
+      const listResult = await listAll(fotosRef);
+
+      if (listResult.items.length === 0) {
+        console.warn('Nenhuma foto encontrada neste dispositivo.');
+      }
+
+      const arquivosOrdenados = listResult.items
+        .sort((a, b) => b.name.localeCompare(a.name));
+
+      const fotosAtuais = arquivosOrdenados.slice(0, this.limiteFotos-1);
+
+      for (const item of fotosAtuais) {
+        const url = await getDownloadURL(item);
+        const fileName = item.name.replace('.jpg', '');
+        const dateObj = this.parseTimestampToDate(fileName);
+        const dadosPath = `clientes/${clienteId}/dispositivos/${dispositivoId}/dados/${fileName}`;
+        const dadosSnap = await get(child(dbRef, dadosPath));
+        const dados = dadosSnap.exists() ? dadosSnap.val() : null;
+
+        console.log('Foto carregada:', {
+          url,
+          nomeArquivo: fileName,
+          dados,
+          dataConvertida: dateObj
+        });
+
+        this.fotosCapturadas.push({ url, dados, dateObj: dateObj });
+      }
+    } catch (error) {
+      console.error('Erro ao carregar fotos:', error);
+    }
+  }
+
   async carregarDispositivosPre() {
     const dbRef = ref(this.db);
-    const role = this.auth.getRole(); 
-    const clienteId = this.auth.getClienteId(); 
+    const role = this.auth.getRole();
+    const clienteId = this.auth.getClienteId();
 
     try {
-      if (role === 'root') {
-        const snapshotPre = await get(child(dbRef, 'mapaSn'));
-        if (snapshotPre.exists()) {
-          const dispositivos = snapshotPre.val();
-          const dispositivoIds = Object.keys(dispositivos);
-          this.contabilizarDadosPre(dispositivos, dispositivoIds);
-          console.log('Dispositivos pré-cadastrados:', dispositivoIds);
-        }
-      } else {
-        if (!clienteId) {
-          console.error('clienteId não encontrado!');
-          return;
-        }
+      const snapshotPre = await get(child(dbRef, 'mapaSn'));
+      if (snapshotPre.exists()) {
+        const dispositivos = snapshotPre.val();
+        const dispositivoIds = Object.keys(dispositivos);
 
-        const snapshotPre = await get(child(dbRef, 'mapaSn'));
-        if (snapshotPre.exists()) {
-          const dispositivos = snapshotPre.val();
-          const dispositivoIds = Object.keys(dispositivos);
+        const dispositivosFiltrados = role === 'root'
+          ? dispositivoIds
+          : dispositivoIds.filter(id => dispositivos[id].clienteId === clienteId);
 
-
-          console.log('Dispositivos pré-cadastrados:', dispositivoIds);  
-          // Filtrando os dispositivos para o clienteId logado
-          const dispositivosFiltrados = dispositivoIds.filter((dispositivoId) => {
-            return dispositivos[dispositivoId].clienteId === clienteId;
-          });
-
-          // Contabiliza os dispositivos filtrados
-          this.contabilizarDadosPre(dispositivos, dispositivosFiltrados);
-        }
+        this.contabilizarDadosPre(dispositivos, dispositivosFiltrados);
       }
     } catch (error) {
       console.error('Erro ao carregar dispositivos pré-cadastrados:', error);
@@ -143,118 +184,114 @@ export class DashboardRoot implements OnInit {
   }
 
   contabilizarDadosPre(dispositivos: any, dispositivoIds: string[]) {
-    let totalDispositivosPre = 0;
-
-    dispositivoIds.forEach((dispositivoId) => {
-      const dispositivo = dispositivos[dispositivoId];
-
-      console.log(dispositivo);  
-
-      totalDispositivosPre++;
-    });
-
-    console.log('Total de dispositivos pré-cadastrados:', totalDispositivosPre);
-    this.totalDispositivosPre = totalDispositivosPre;
+    this.totalDispositivosPre = dispositivoIds.length;
   }
 
   contabilizarDados(clientes: any, clienteIds: string[]) {
     let totalUsuarios = 0;
     let totalDispositivos = 0;
     let dispositivosOffline = 0;
+    this.dispositivosFiltrados = [];
 
     clienteIds.forEach((clienteId) => {
       const cliente = clientes[clienteId];
       const dispositivos = cliente.dispositivos ? Object.keys(cliente.dispositivos) : [];
-
       totalDispositivos += dispositivos.length;
-      dispositivos.forEach((dispositivoId) => {
-        const dispositivo = cliente.dispositivos[dispositivoId];
-        
-        // Verificando status do dispositivo
-        if (dispositivo.status === 'offline') {
-          dispositivosOffline++;
-        }
-
-        // Filtros por dispositivo e período
-        if (this.periodoInicio && this.periodoFim) {
-          const dados = dispositivo.dados ? Object.keys(dispositivo.dados) : [];
-          dados.forEach((timestamp) => {
-            const dataTimestamp = timestamp;  // Considerando o timestamp do dado
-            if (dataTimestamp >= this.periodoInicio && dataTimestamp <= this.periodoFim) {
-              // Se o dado estiver dentro do período, incluir o dispositivo
-              this.dispositivosFiltrados.push(dispositivo);
-            }
-          });
-        } else {
-          // Se o período não estiver filtrado, incluir todos os dispositivos
-          this.dispositivosFiltrados.push(dispositivo);
-        }
-      });
-
       totalUsuarios += cliente.usuarios ? Object.keys(cliente.usuarios).length : 0;
     });
 
     this.totalUsuarios = totalUsuarios;
     this.totalDispositivos = totalDispositivos;
     this.dispositivosOffline = dispositivosOffline;
-    
-    // Após carregar os dados, gerar o gráfico
     this.createChart();
   }
 
-  // Função para criar o gráfico
+  async carregarDadosGraficoPorDispositivo(dispositivoId: string) {
+    const clienteId = this.auth.getClienteId();
+    const caminho = `clientes/${clienteId}/dispositivos/${dispositivoId}/dados`;
+    const dbRef = ref(this.db);
+
+    try {
+      const snapshot = await get(child(dbRef, caminho));
+      if (!snapshot.exists()) {
+        console.warn('Nenhum dado encontrado para o dispositivo.');
+        return;
+      }
+
+      const dados = snapshot.val();
+      const entradas = Object.entries(dados) as [string, any][];
+
+      const ultimos = entradas
+        .sort((a, b) => b[0].localeCompare(a[0]))
+        .slice(0, 10)
+        .reverse(); // reverso para mostrar do mais antigo ao mais novo
+
+      const labels = ultimos.map(([timestamp]) => timestamp.slice(9)); // mostra só HHMMSS
+      const temperaturas = ultimos.map(([, v]) => v.temperatura ?? 0);
+      const umidades = ultimos.map(([, v]) => v.umidade ?? 0);
+
+      if (this.grafico) {
+        this.grafico.destroy();
+      }
+
+      const ctx = document.getElementById('graficoDispositivo') as HTMLCanvasElement;
+      this.grafico = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Temperatura (°C)',
+              data: temperaturas,
+              borderColor: 'red',
+              tension: 0.3,
+              fill: false
+            },
+            {
+              label: 'Umidade (%)',
+              data: umidades,
+              borderColor: 'blue',
+              tension: 0.3,
+              fill: false
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            x: {
+              title: { display: true, text: 'Hora' }
+            },
+            y: {
+              title: { display: true, text: 'Valor' },
+              beginAtZero: true
+            }
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Erro ao carregar dados do gráfico:', error);
+    }
+  }
+
+
   createChart() {
     const dispositivosDados = this.dispositivosFiltrados.map((dispositivo) => {
       const dados = dispositivo.dados ? Object.keys(dispositivo.dados) : [];
-      return dados.length;  // Exemplo: contar os dados de cada dispositivo
+      return dados.length;
     });
 
-    const labels = this.dispositivosFiltrados.map((dispositivo) => dispositivo.nome);  // Use o nome do dispositivo como label
+    const labels = this.dispositivosFiltrados.map((dispositivo) => dispositivo.nome || dispositivo.id);
 
-    // Configuração do gráfico de linha
     this.lineChartData = {
-      labels: labels,  // Labels são os nomes dos dispositivos
+      labels,
       datasets: [{
         label: 'Quantidade de Dados por Dispositivo',
-        data: dispositivosDados,  // Quantidade de dados para cada dispositivo
-        borderColor: 'rgb(75, 192, 192)',  // Cor da linha
+        data: dispositivosDados,
+        borderColor: 'rgb(75, 192, 192)',
         fill: false,
         tension: 0.1
       }]
     };
   }
-
-  async carregarFotos() {
-  const storage = getStorage();  // Acessando o Firebase Storage
-  const clienteId = this.auth.getClienteId();
-
-  this.fotosCapturadas = [];  // Limpa as fotos anteriores
-
-  // Iterando sobre os dispositivos filtrados do cliente
-  for (const dispositivo of this.dispositivosFiltrados) {
-    // Referência para o diretório de fotos do dispositivo no Firebase Storage
-    const fotosRef = storageRef(storage, `clientes/${clienteId}/dispositivos/${dispositivo.id}/fotos`);
-
-    console.log('Referência de storage:', fotosRef);  // Verificando a referência do Storage
-
-    try {
-      // Obtendo a lista de fotos dentro da pasta do dispositivo
-      const fotosSnapshot = await listAll(fotosRef);  // Obtém a lista de arquivos
-      console.log('Fotos no Storage:', fotosSnapshot.items);  // Verifica as fotos encontradas
-
-      // Para cada foto, obtemos a URL de download
-      for (const fotoRef of fotosSnapshot.items) {
-        const url = await getDownloadURL(fotoRef);  // Obtendo a URL da foto
-        this.fotosCapturadas.push({ url });  // Armazenando a URL no array
-        console.log('Foto carregada com sucesso:', url);  // Verificando a URL carregada
-      }
-    } catch (error) {
-      console.error('Erro ao carregar fotos do dispositivo:', error);
-    }
-  }
 }
-
-
-
-}
-
