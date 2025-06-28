@@ -7,7 +7,6 @@
 #include <LittleFS.h>
 #include <config.h> 
 #include <ca_bundle.h>
-#include <ca_bundle_rtdb.h> 
 
 //================== Provisionamento online ============
 
@@ -178,9 +177,10 @@ inline bool refreshIdToken(const String &apiKey, String &refreshToken, String &i
 
 // ================= Upload para Firebase Storage =================
 
-inline bool uploadToFirebaseStorage(const String &bucket, const String &remotePath, const String &localFilePath, const String &idToken) {
+inline bool uploadToFirebaseStorage(const String &bucket, const String &remotePath, camera_fb_t* fb, const String &idToken) {
     WiFiClientSecure client;
     client.setCACert(CA_BUNDLE);
+    client.setTimeout(5000);
 
     const char* host = "firebasestorage.googleapis.com";
     const int httpsPort = 443;
@@ -190,15 +190,8 @@ inline bool uploadToFirebaseStorage(const String &bucket, const String &remotePa
         return false;
     }
 
-    File file = LittleFS.open(localFilePath, "r");
-    if (!file) {
-        DEBUG("Falha ao abrir o arquivo para upload");
-        client.stop();
-        return false;
-    }
-
-    size_t fileSize = file.size();
-    DEBUGF("Arquivo aberto. Tamanho: %d bytes\n", fileSize);
+    size_t fileSize = fb->len;
+    DEBUGF("Imagem capturada. Tamanho: %d bytes\n", fileSize);
 
     String url = "/v0/b/" + bucket + "/o?name=" + remotePath + "&uploadType=media";
 
@@ -211,53 +204,77 @@ inline bool uploadToFirebaseStorage(const String &bucket, const String &remotePa
 
     client.print(header);
 
-    // Upload em chunks
     const size_t chunkSize = 4096;
-    uint8_t buffer[chunkSize];
     size_t sent = 0;
-    client.setNoDelay(true);
 
-    while (file.available()) {
-        size_t len = file.readBytes((char *)buffer, chunkSize);
-        client.write(buffer, len);
-        sent += len;
+    while (sent < fileSize) {
+        size_t toSend = min(chunkSize, fileSize - sent);
+        client.write(fb->buf + sent, toSend);
+        sent += toSend;
         float progress = (sent * 100.0) / fileSize;
         DEBUGF("Upload: %.2f%%\n", progress);
+        delay(5);
     }
-
-    file.close();
     DEBUG("Upload enviado. Aguardando resposta...");
 
-    // Ler resposta HTTP
+    // Lê status HTTP
+    bool httpOk = false;
+    bool erroEncontrado = false;
+    String buffer = "";
+
     while (client.connected()) {
         String line = client.readStringUntil('\n');
-        if (line == "\r") break;
+        line.trim();
+
+        if (line.startsWith("HTTP/1.1 200") || line.startsWith("HTTP/1.1 2")) {
+            httpOk = true;
+        }
+
+        if (line.length() == 0) break;
     }
 
-    String payload = client.readString();
-    DEBUG("Resposta Storage:");
-    DEBUG(payload);
+    while (client.available()) {
+        char c = client.read();
+        buffer += c;
 
+        // Checagem incremental para "error"
+        if (buffer.length() >= 7) {
+            if (buffer.indexOf("\"error\"") >= 0) {
+                erroEncontrado = true;
+                break;
+            }
+            if (buffer.length() > 128) buffer = buffer.substring(buffer.length() - 7);  // mantenha só o final
+        }
+    }
+    client.flush();
+    delay(50);
     client.stop();
 
-    if (payload.indexOf("\"error\"") != -1) {
+    if (!httpOk || erroEncontrado) {
         DEBUG("Erro no upload detectado.");
         return false;
     }
-
+    DEBUG("Upload finalizado com sucesso.");
     return true;
 }
+
 
 // ================= Gravação no Realtime Database =================
 
 inline bool writeToFirebaseRTDB(const String &databaseURL, const String &path, const String &idToken, const JsonDocument &json) {
+  
+    if (idToken.isEmpty()) {
+    DEBUG("Token de autenticação vazio. Abortando escrita no RTDB.");
+    return false;
+  }
+  
   WiFiClientSecure client;
-  // client.setCACert(CA_BUNDLE);
-  client.setInsecure();
+  client.setCACert(CA_BUNDLE);
+  // client.setInsecure();
 
   String url = databaseURL + "/" + path + ".json?auth=" + idToken;
 
-  // DEBUGF("URL RTDB: %s\n", url.c_str());
+  //  DEBUGF("URL RTDB: %s\n", url.c_str());
 
   HTTPClient https;
   https.begin(client, url);
@@ -267,16 +284,16 @@ inline bool writeToFirebaseRTDB(const String &databaseURL, const String &path, c
   String requestBody;
   serializeJson(json, requestBody);
 
-  int httpResponseCode = https.PUT(requestBody);
+  int httpResponseCode = https.PATCH(requestBody);
 
   if (httpResponseCode > 0) {
     String response = https.getString();
     DEBUG("Resposta RTDB:");
-    DEBUG(response.c_str());
+    DEBUG(response);
     https.end();
     return true;
   } else {
-    DEBUGF("Erro RTDB: %s\n", https.errorToString(httpResponseCode).c_str());
+    DEBUGF("Erro RTDB: Código %d - %s\n", httpResponseCode, https.getString().c_str());
     https.end();
     return false;
   }

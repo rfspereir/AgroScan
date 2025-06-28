@@ -229,8 +229,8 @@ void initCamera() {
   config.pin_reset = CAM_PIN_RESET;
   config.xclk_freq_hz = 20000000;
   config.pixel_format = PIXFORMAT_JPEG;
-  config.frame_size = FRAMESIZE_XGA;
-  config.jpeg_quality = 15;
+  config.frame_size = FRAMESIZE_VGA;
+  config.jpeg_quality = 25;
   config.fb_count = 1;
 
   if (!psramFound()) {
@@ -294,14 +294,18 @@ void enviarDadosFirebase(void *pvParameters) {
   if (bits & EV_FIRE) {
     int contador = 0;
     initCamera();
+
+    DEBUGF("[STACK] Início da tarefa: %u words (~%u bytes livres)\n",
+                  uxTaskGetStackHighWaterMark(NULL),
+                  uxTaskGetStackHighWaterMark(NULL) * 4);
     for (;;) {
       if (signupOK && xSemaphoreTake(xSemaphore, pdMS_TO_TICKS(100)) == pdTRUE) {
         if (millis() - lastTokenUpdate > 3300000) {  // 55 minutos
           if (refreshIdToken(API_KEY, refreshToken, idToken, localId)) {
-            Serial.println("Token renovado com sucesso!");
+            DEBUG("Token renovado com sucesso!");
             lastTokenUpdate = millis(); 
           } else {
-            Serial.println("Falha ao renovar o token.");
+            DEBUG("Falha ao renovar o token.");
             xSemaphoreGive(xSemaphore);
             vTaskDelay(pdMS_TO_TICKS(10000));
             continue;
@@ -313,24 +317,28 @@ void enviarDadosFirebase(void *pvParameters) {
         char timestamp[30];
         strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", &timeinfo);
 
+        DEBUG("Capturando imagem...");
+
         camera_fb_t *fb = esp_camera_fb_get();
         if (!fb) {
-          DEBUG(" Falha na captura");
+          DEBUG("Erro ao capturar imagem");
           xSemaphoreGive(xSemaphore);
           vTaskDelay(pdMS_TO_TICKS(10000));
           continue;
         }
 
-        const char *localPath = "/cap.jpg";
-        File f = LittleFS.open(localPath, FILE_WRITE);
-        f.write(fb->buf, fb->len);
-        f.close();
+        DEBUGF("Imagem capturada. Tamanho: %d bytes\n", fb->len);
+
 
         String remotePath = String("clientes/") + clienteId + "/dispositivos/" + dispositivoUID + "/fotos/" + timestamp + ".jpg";
         DEBUGF("remotePath: %s\n", remotePath.c_str());
+        DEBUG("Iniciando upload...");
+        bool uploadSuccess = uploadToFirebaseStorage(STORAGE_BUCKET, remotePath, fb, idToken);
 
-        bool uploadSuccess = uploadToFirebaseStorage(STORAGE_BUCKET, remotePath, localPath, idToken);
-        
+        DEBUGF("[STACK] Após upload: %u words (~%u bytes livres)\n",
+                      uxTaskGetStackHighWaterMark(NULL),
+                      uxTaskGetStackHighWaterMark(NULL) * 4);
+
         if (uploadSuccess) {
           String dbPath = String("clientes/") + clienteId + "/dispositivos/" + dispositivoUID + "/dados/" + timestamp;
           
@@ -340,11 +348,14 @@ void enviarDadosFirebase(void *pvParameters) {
           json["contador"] = String(contador).c_str();
 
           writeToFirebaseRTDB(DATABASE_URL, dbPath, idToken, json);
+
+          DEBUGF("[STACK] Após gravação no RTDB: %u words (~%u bytes livres)\n",
+                        uxTaskGetStackHighWaterMark(NULL),
+                        uxTaskGetStackHighWaterMark(NULL) * 4);
         } else {
           DEBUG("Falha no upload.");
         }
 
-        LittleFS.remove(localPath);
         esp_camera_fb_return(fb);
 
         xSemaphoreGive(xSemaphore);
@@ -374,13 +385,13 @@ void setup() {
       xEventGroupKey = xEventGroupCreate();
       xSemaphore = xSemaphoreCreateBinary();
       if (xSemaphore) xSemaphoreGive(xSemaphore);
-      xTaskCreate(initWiFi, "initWiFi", 4096, NULL, 14, NULL);
+      xTaskCreate(initWiFi, "initWiFi", 4096, NULL, 3, NULL);
       if (clienteId == "" || clienteId == "null" || dispositivoUID == "" || dispositivoUID == "null") {
         DEBUG("Dados de provisionamento não encontrados. Executando provisionamento online...");
-        xTaskCreate(taskProvisionarDispositivo, "taskProvisionarDispositivo", 8096, NULL, 14, NULL);
+        xTaskCreate(taskProvisionarDispositivo, "taskProvisionarDispositivo", 8096, NULL, 3, NULL);
       }else{
-        xTaskCreate(conectarFirebase, "conectarFirebase", 8096, NULL, 14, NULL);
-        xTaskCreatePinnedToCore(enviarDadosFirebase, "enviarDadosFirebase", 30400, NULL, 1, NULL,1);
+        xTaskCreate(conectarFirebase, "conectarFirebase", 8096, NULL, 5, NULL);
+        xTaskCreatePinnedToCore(enviarDadosFirebase, "enviarDadosFirebase", 30400, NULL, 4, NULL,1);
       }
     }
   }
