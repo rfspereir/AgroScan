@@ -8,8 +8,10 @@
 #include <WebServer.h>
 #include <DNSServer.h>
 
+#include <DHT.h>
+
 #include <config.h>
-#include <camera_pins.h>
+#include <pins.h>
 #include <firebase.h>
 #include <ca_bundle.h>
 
@@ -27,18 +29,17 @@ SemaphoreHandle_t xSemaphore;
 
 #define EV_WIFI (1 << 1)
 #define EV_FIRE (1 << 2)
-
-QueueHandle_t queueContador = xQueueCreate(8, sizeof(int));
+DHT dht(DHT_PIN, DHTTYPE);
 
 // ================== Reset Físico ==================
 
 void checarResetFisico() {
   DEBUG("Checando reset físico...");
-  pinMode(PIN_RESET, INPUT_PULLUP);
+  pinMode(RESET_PIN, INPUT_PULLUP);
   vTaskDelay(pdMS_TO_TICKS(1000));
-  if (digitalRead(PIN_RESET) == LOW) {
+  if (digitalRead(RESET_PIN) == LOW) {
     unsigned long tempo = millis();
-    while (digitalRead(PIN_RESET) == LOW) {
+    while (digitalRead(RESET_PIN) == LOW) {
       if (millis() - tempo > 5000) {  // 5 segundos segurando
         DEBUG("Reset físico iniciado...");
         LittleFS.begin();
@@ -229,8 +230,8 @@ void initCamera() {
   config.pin_reset = CAM_PIN_RESET;
   config.xclk_freq_hz = 20000000;
   config.pixel_format = PIXFORMAT_JPEG;
-  config.frame_size = FRAMESIZE_VGA;
-  config.jpeg_quality = 25;
+  config.frame_size = FRAMESIZE_QXGA;
+  config.jpeg_quality = 15;
   config.fb_count = 1;
 
   if (!psramFound()) {
@@ -292,12 +293,14 @@ void conectarFirebase(void *pvParameters) {
 void enviarDadosFirebase(void *pvParameters) {
   EventBits_t bits = xEventGroupWaitBits(xEventGroupKey, EV_FIRE, pdFALSE, pdTRUE, portMAX_DELAY);
   if (bits & EV_FIRE) {
-    int contador = 0;
     initCamera();
+    dht.begin();
+    int intervaloEnvio = obterIntervaloEnvio(DATABASE_URL, clienteId, dispositivoUID, idToken, 60);
+    DEBUG("Sensor DHT11 iniciado (se conectado).");
 
-    DEBUGF("[STACK] Início da tarefa: %u words (~%u bytes livres)\n",
-                  uxTaskGetStackHighWaterMark(NULL),
-                  uxTaskGetStackHighWaterMark(NULL) * 4);
+    // DEBUGF("[STACK] Início da tarefa: %u words (~%u bytes livres)\n",
+    //               uxTaskGetStackHighWaterMark(NULL),
+    //               uxTaskGetStackHighWaterMark(NULL) * 4);
     for (;;) {
       if (signupOK && xSemaphoreTake(xSemaphore, pdMS_TO_TICKS(100)) == pdTRUE) {
         if (millis() - lastTokenUpdate > 3300000) {  // 55 minutos
@@ -311,8 +314,6 @@ void enviarDadosFirebase(void *pvParameters) {
             continue;
           }
         }
-        contador++;
-        DEBUGF("Contador: %d\n", contador);
         struct tm timeinfo = rtc.getTimeStruct();
         char timestamp[30];
         strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", &timeinfo);
@@ -335,9 +336,9 @@ void enviarDadosFirebase(void *pvParameters) {
         DEBUG("Iniciando upload...");
         bool uploadSuccess = uploadToFirebaseStorage(STORAGE_BUCKET, remotePath, fb, idToken);
 
-        DEBUGF("[STACK] Após upload: %u words (~%u bytes livres)\n",
-                      uxTaskGetStackHighWaterMark(NULL),
-                      uxTaskGetStackHighWaterMark(NULL) * 4);
+        // DEBUGF("[STACK] Após upload: %u words (~%u bytes livres)\n",
+        //               uxTaskGetStackHighWaterMark(NULL),
+        //               uxTaskGetStackHighWaterMark(NULL) * 4);
 
         if (uploadSuccess) {
           String dbPath = String("clientes/") + clienteId + "/dispositivos/" + dispositivoUID + "/dados/" + timestamp;
@@ -345,21 +346,36 @@ void enviarDadosFirebase(void *pvParameters) {
           StaticJsonDocument<1024> json;
           json["timestamp"] = String(timestamp).c_str();
           json["path"] = remotePath.c_str();
-          json["contador"] = String(contador).c_str();
+
+          float temperatura = dht.readTemperature();
+          float umidade = dht.readHumidity();
+
+          if (!isnan(temperatura)) {
+            json["temperatura"] = temperatura;
+          } else {
+            DEBUG("Sensor DHT11 ausente ou leitura de temperatura inválida.");
+          }
+
+          if (!isnan(umidade)) {
+            json["umidade"] = umidade;
+          } else {
+            DEBUG("Sensor DHT11 ausente ou leitura de umidade inválida.");
+          }
 
           writeToFirebaseRTDB(DATABASE_URL, dbPath, idToken, json);
 
-          DEBUGF("[STACK] Após gravação no RTDB: %u words (~%u bytes livres)\n",
-                        uxTaskGetStackHighWaterMark(NULL),
-                        uxTaskGetStackHighWaterMark(NULL) * 4);
+          // DEBUGF("[STACK] Após gravação no RTDB: %u words (~%u bytes livres)\n",
+          //               uxTaskGetStackHighWaterMark(NULL),
+          //               uxTaskGetStackHighWaterMark(NULL) * 4);
         } else {
           DEBUG("Falha no upload.");
         }
 
         esp_camera_fb_return(fb);
 
+        DEBUGF("Aguardando próxima leitura em %d segundos...\n", intervaloEnvio);
         xSemaphoreGive(xSemaphore);
-        vTaskDelay(pdMS_TO_TICKS(60000));
+        vTaskDelay(pdMS_TO_TICKS(intervaloEnvio* 1000));
       }
     }
   }

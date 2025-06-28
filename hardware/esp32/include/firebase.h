@@ -191,7 +191,7 @@ inline bool uploadToFirebaseStorage(const String &bucket, const String &remotePa
     }
 
     size_t fileSize = fb->len;
-    DEBUGF("Imagem capturada. Tamanho: %d bytes\n", fileSize);
+    DEBUGF("Enviando imagem. Tamanho: %d bytes\n", fileSize);
 
     String url = "/v0/b/" + bucket + "/o?name=" + remotePath + "&uploadType=media";
 
@@ -270,7 +270,6 @@ inline bool writeToFirebaseRTDB(const String &databaseURL, const String &path, c
   
   WiFiClientSecure client;
   client.setCACert(CA_BUNDLE);
-  // client.setInsecure();
 
   String url = databaseURL + "/" + path + ".json?auth=" + idToken;
 
@@ -297,6 +296,34 @@ inline bool writeToFirebaseRTDB(const String &databaseURL, const String &path, c
     https.end();
     return false;
   }
+}
+
+inline int obterIntervaloEnvio(const String& databaseURL, const String& clienteId, const String& dispositivoUID, const String& idToken, int valorPadrao) {
+  WiFiClientSecure client;
+  client.setCACert(CA_BUNDLE);
+
+  String path = "clientes/" + clienteId + "/dispositivos/" + dispositivoUID + "/config/intervaloEnvioSegundos";
+  String url = databaseURL + "/" + path + ".json?auth=" + idToken;
+
+  HTTPClient https;
+  https.begin(client, url);
+  int httpCode = https.GET();
+
+  int intervalo = valorPadrao;
+  if (httpCode == 200) {
+    String payload = https.getString();
+    intervalo = payload.toInt();
+    if (intervalo <= 0) {
+      DEBUG("Intervalo inválido recebido, usando valor padrão.");
+      intervalo = valorPadrao; 
+    }
+    DEBUGF("Intervalo obtido: %d segundos\n", intervalo);
+  } else {
+    DEBUGF("Erro ao obter intervalo: código %d\n", httpCode);
+  }
+
+  https.end();
+  return intervalo;
 }
 
 #endif

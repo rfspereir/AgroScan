@@ -44,8 +44,10 @@
   #define CAM_PIN_PCLK    13
 
   //outros pinos
-  //Reset
-  #define PIN_RESET       12
+
+  #define RESET_PIN       12
+  #define DHT_PIN 13
+  #define DHTTYPE DHT11
 
 #else
   #error "Nenhum alvo de câmera definido. Use -D CONFIG_TARGET_ESP32CAM ou -D CONFIG_TARGET_ESP32S3CAM"
