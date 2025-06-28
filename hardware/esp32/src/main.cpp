@@ -230,8 +230,8 @@ void initCamera() {
   config.pin_reset = CAM_PIN_RESET;
   config.xclk_freq_hz = 20000000;
   config.pixel_format = PIXFORMAT_JPEG;
-  config.frame_size = FRAMESIZE_QXGA;
-  config.jpeg_quality = 15;
+  config.frame_size = FRAMESIZE_SXGA;
+  config.jpeg_quality = 5;
   config.fb_count = 1;
 
   if (!psramFound()) {
@@ -239,6 +239,43 @@ void initCamera() {
   }
 
   esp_err_t err = esp_camera_init(&config);
+  sensor_t *s = esp_camera_sensor_get();
+  if(s){
+    s->set_contrast(s, 1);                  // -2 a 2
+    s->set_brightness(s, 1);                // -2 a 2
+    s->set_saturation(s, 0);                // -2 a 2
+    s->set_whitebal(s, 1);                  // 1 = ligado
+    s->set_awb_gain(s, 1);                  // 1 = ligado
+    s->set_wb_mode(s, 0);                   // 0 = automático, 1 = nublado, 2 = fluorescente, 3 = incandescente
+    s->set_gain_ctrl(s, 1);                 // Controle de ganho automático
+    s->set_exposure_ctrl(s, 1);            // Controle de exposição automático
+    s->set_gainceiling(s, GAINCEILING_32X); // Limite de ganho
+    s->set_colorbar(s, 0);                  // 0 = sem barras de cor (desliga modo teste)
+    //DEBUG:
+    DEBUG("=== CONFIGURAÇÕES ATUAIS DA CÂMERA ===");
+    DEBUGF("Brilho (brightness): %d\n", s->status.brightness);
+    DEBUGF("Contraste (contrast): %d\n", s->status.contrast);
+    DEBUGF("Saturação (saturation): %d\n", s->status.saturation);
+    DEBUGF("Efeito especial (special_effect): %d\n", s->status.special_effect);
+    DEBUGF("Auto White Balance (awb): %d\n", s->status.awb);
+    DEBUGF("Modo WB (wb_mode): %d\n", s->status.wb_mode);
+    DEBUGF("Auto Exposure Control 2 (aec2): %d\n", s->status.aec2);
+    DEBUGF("Ganho automático (agc): %d\n", s->status.agc);
+    DEBUGF("Colorbar ativado: %d\n", s->status.colorbar);
+    DEBUGF("Espelho horizontal (hmirror): %d\n", s->status.hmirror);
+    DEBUGF("Espelho vertical (vflip): %d\n", s->status.vflip);
+    DEBUGF("Denoise: %d\n", s->status.denoise);
+    DEBUGF("Correção de pixel ruim (bpc): %d\n", s->status.bpc);
+    DEBUGF("Correção de pixel branco (wpc): %d\n", s->status.wpc);
+  }
+  // Aguarda a câmera estabilizar
+
+  for (int i = 0; i < 5; i++) {
+    camera_fb_t *fb = esp_camera_fb_get();
+    if (fb) esp_camera_fb_return(fb);
+    vTaskDelay(pdMS_TO_TICKS(500));
+  }
+
   if (err != ESP_OK) {
     DEBUGF("Erro na inicialização da câmera: 0x%X\n", err);
   } else {
@@ -298,9 +335,6 @@ void enviarDadosFirebase(void *pvParameters) {
     int intervaloEnvio = obterIntervaloEnvio(DATABASE_URL, clienteId, dispositivoUID, idToken, 60);
     DEBUG("Sensor DHT11 iniciado (se conectado).");
 
-    // DEBUGF("[STACK] Início da tarefa: %u words (~%u bytes livres)\n",
-    //               uxTaskGetStackHighWaterMark(NULL),
-    //               uxTaskGetStackHighWaterMark(NULL) * 4);
     for (;;) {
       if (signupOK && xSemaphoreTake(xSemaphore, pdMS_TO_TICKS(100)) == pdTRUE) {
         if (millis() - lastTokenUpdate > 3300000) {  // 55 minutos
@@ -330,15 +364,10 @@ void enviarDadosFirebase(void *pvParameters) {
 
         DEBUGF("Imagem capturada. Tamanho: %d bytes\n", fb->len);
 
-
         String remotePath = String("clientes/") + clienteId + "/dispositivos/" + dispositivoUID + "/fotos/" + timestamp + ".jpg";
         DEBUGF("remotePath: %s\n", remotePath.c_str());
         DEBUG("Iniciando upload...");
         bool uploadSuccess = uploadToFirebaseStorage(STORAGE_BUCKET, remotePath, fb, idToken);
-
-        // DEBUGF("[STACK] Após upload: %u words (~%u bytes livres)\n",
-        //               uxTaskGetStackHighWaterMark(NULL),
-        //               uxTaskGetStackHighWaterMark(NULL) * 4);
 
         if (uploadSuccess) {
           String dbPath = String("clientes/") + clienteId + "/dispositivos/" + dispositivoUID + "/dados/" + timestamp;
@@ -350,13 +379,13 @@ void enviarDadosFirebase(void *pvParameters) {
           float temperatura = dht.readTemperature();
           float umidade = dht.readHumidity();
 
-          if (!isnan(temperatura)) {
+          if (!isnan(temperatura) && temperatura != 0) {
             json["temperatura"] = temperatura;
           } else {
             DEBUG("Sensor DHT11 ausente ou leitura de temperatura inválida.");
           }
 
-          if (!isnan(umidade)) {
+          if (!isnan(umidade)&& umidade != 0) {
             json["umidade"] = umidade;
           } else {
             DEBUG("Sensor DHT11 ausente ou leitura de umidade inválida.");
@@ -364,9 +393,6 @@ void enviarDadosFirebase(void *pvParameters) {
 
           writeToFirebaseRTDB(DATABASE_URL, dbPath, idToken, json);
 
-          // DEBUGF("[STACK] Após gravação no RTDB: %u words (~%u bytes livres)\n",
-          //               uxTaskGetStackHighWaterMark(NULL),
-          //               uxTaskGetStackHighWaterMark(NULL) * 4);
         } else {
           DEBUG("Falha no upload.");
         }
