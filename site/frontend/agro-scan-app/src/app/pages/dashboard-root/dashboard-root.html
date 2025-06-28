@@ -27,7 +27,7 @@
     </div>
   </div>
 
-  <!-- Filtros de período -->
+  <!-- Filtros de período
   <div *ngIf="auth.getRole() !== 'root'">
     <h2>Filtros de Período</h2>
 
@@ -36,7 +36,7 @@
 
     <label for="fim">Data Fim:</label>
     <input type="date" id="fim" [(ngModel)]="periodoFim" (change)="definirPeriodo(periodoInicio, periodoFim)" />
-  </div>
+  </div> -->
 
   <!-- Exibindo o gráfico -->
   <div *ngIf="auth.getRole() !== 'root'">
@@ -45,4 +45,12 @@
       <canvas id="myChart"></canvas>
     </div>
   </div>
+
+  <!-- Galeria de fotos capturadas pelo ESP32 -->
+<div *ngIf="fotosCapturadas.length > 0">
+  <h3>Fotos Capturadas:</h3>
+  <div *ngFor="let foto of fotosCapturadas">
+    <img [src]="foto.url" alt="Foto do dispositivo" width="200" height="150"/>
+  </div>
 </div>
+

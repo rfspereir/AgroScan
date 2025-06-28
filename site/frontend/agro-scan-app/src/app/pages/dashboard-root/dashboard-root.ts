@@ -6,6 +6,7 @@ import { Database, ref, get, child } from '@angular/fire/database';
 import { AuthService } from '../../services/auth.service';
 import { FormsModule } from '@angular/forms';
 import { Chart } from 'chart.js';  // Importando Chart.js
+import { getStorage, ref as storageRef, getDownloadURL, listAll } from '@angular/fire/storage';
 
 @Component({
   selector: 'app-dashboard-root',
@@ -24,6 +25,7 @@ export class DashboardRoot implements OnInit {
   periodoFim: string = '';
   dispositivoSelecionado: string = '';
   totalDispositivosPre = 0;
+  fotosCapturadas: any[] = [];
   
   // Dados para o gráfico
   public lineChartData: any;
@@ -53,6 +55,7 @@ export class DashboardRoot implements OnInit {
 
   ngOnInit(): void {
     if (this.auth.getRole() !== 'root') {
+      this.carregarFotos();
       this.carregarDados();
       this.createChart(); 
     }
@@ -154,7 +157,6 @@ export class DashboardRoot implements OnInit {
     this.totalDispositivosPre = totalDispositivosPre;
   }
 
-
   contabilizarDados(clientes: any, clienteIds: string[]) {
     let totalUsuarios = 0;
     let totalDispositivos = 0;
@@ -200,20 +202,6 @@ export class DashboardRoot implements OnInit {
     this.createChart();
   }
 
-  // Definir filtros de período
-  definirPeriodo(inicio: string, fim: string) {
-    this.periodoInicio = inicio;
-    this.periodoFim = fim;
-    this.dispositivosFiltrados = [];  // Limpa os dispositivos filtrados
-    this.carregarDados();  // Recarrega os dados com o filtro aplicado
-  }
-
-  // Seleção de dispositivo (para filtro específico)
-  selecionarDispositivo(dispositivoId: string) {
-    this.dispositivoSelecionado = dispositivoId;
-    this.carregarDados();  // Recarregar dados aplicando o filtro de dispositivo
-  }
-
   // Função para criar o gráfico
   createChart() {
     const dispositivosDados = this.dispositivosFiltrados.map((dispositivo) => {
@@ -235,4 +223,38 @@ export class DashboardRoot implements OnInit {
       }]
     };
   }
+
+  async carregarFotos() {
+  const storage = getStorage();  // Acessando o Firebase Storage
+  const clienteId = this.auth.getClienteId();
+
+  this.fotosCapturadas = [];  // Limpa as fotos anteriores
+
+  // Iterando sobre os dispositivos filtrados do cliente
+  for (const dispositivo of this.dispositivosFiltrados) {
+    // Referência para o diretório de fotos do dispositivo no Firebase Storage
+    const fotosRef = storageRef(storage, `clientes/${clienteId}/dispositivos/${dispositivo.id}/fotos`);
+
+    console.log('Referência de storage:', fotosRef);  // Verificando a referência do Storage
+
+    try {
+      // Obtendo a lista de fotos dentro da pasta do dispositivo
+      const fotosSnapshot = await listAll(fotosRef);  // Obtém a lista de arquivos
+      console.log('Fotos no Storage:', fotosSnapshot.items);  // Verifica as fotos encontradas
+
+      // Para cada foto, obtemos a URL de download
+      for (const fotoRef of fotosSnapshot.items) {
+        const url = await getDownloadURL(fotoRef);  // Obtendo a URL da foto
+        this.fotosCapturadas.push({ url });  // Armazenando a URL no array
+        console.log('Foto carregada com sucesso:', url);  // Verificando a URL carregada
+      }
+    } catch (error) {
+      console.error('Erro ao carregar fotos do dispositivo:', error);
+    }
+  }
 }
+
+
+
+}
+

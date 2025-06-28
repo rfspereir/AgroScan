@@ -229,8 +229,8 @@ void initCamera() {
   config.pin_reset = CAM_PIN_RESET;
   config.xclk_freq_hz = 20000000;
   config.pixel_format = PIXFORMAT_JPEG;
-  config.frame_size = FRAMESIZE_QXGA;
-  config.jpeg_quality = 12;
+  config.frame_size = FRAMESIZE_XGA;
+  config.jpeg_quality = 15;
   config.fb_count = 1;
 
   if (!psramFound()) {
@@ -348,7 +348,7 @@ void enviarDadosFirebase(void *pvParameters) {
         esp_camera_fb_return(fb);
 
         xSemaphoreGive(xSemaphore);
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        vTaskDelay(pdMS_TO_TICKS(60000));
       }
     }
   }

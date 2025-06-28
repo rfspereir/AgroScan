@@ -1,35 +1,44 @@
-.dashboard {
-  padding: 20px;
-}
-
-.dashboard h1 {
-  margin-bottom: 24px;
+/* Cartões compactos */
+.card {
+  padding: 16px;  
+  border-radius: 8px;
+  background-color: var(--cor-branco);
+  box-shadow: 1px 2px 8px rgba(0,0,0,0.1);
+  border: 1px solid var(--cor-cinza-medio);
+  display: center;
+  flex-direction: center;
+  justify-content: center;;
+  align-items: center;
+  max-width: 250px;
+  gap: 16px;  
 }
 
 .cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));  
+  gap: 16px; 
 }
 
-.card {
-  padding: 24px;
+#myChart {
+  width: 100%;
+  height: 400px;  
+  max-width: 25%; 
+}
+
+.galeria {
+  margin-top: 40px;
+  padding: 20px;
+}
+
+.fotos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 16px;
+}
+
+.foto img {
+  width: 100%;
+  height: auto;
   border-radius: 8px;
-  background-color: var(--cor-branco);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  border: 1px solid var(--cor-cinza-medio);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-}
-
-.card h2 {
-  margin-top: 0;
-  font-weight: 600;
-}
-
-.card p {
-  font-size: 2rem;
-  margin: 8px 0 0 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }

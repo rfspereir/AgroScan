@@ -4,6 +4,14 @@ import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
 import cors from "cors";
 
+import * as path from "path";
+import * as os from "os";
+import * as fs from "fs";
+import axios from "axios";
+import {onObjectFinalized} from "firebase-functions/v2/storage";
+import FormData from "form-data";
+
+
 admin.initializeApp();
 
 export const createUser = onCall(async (request) => {
@@ -297,3 +305,60 @@ export const deleteDevice = functions.https.onRequest(async (req, res) => {
     }
   });
 });
+
+export const onImageUpload = onObjectFinalized(
+  // {
+  //   region: "us-central1",
+  //   bucket: "agroscan-c8a09.appspot.com",
+  // },
+  async (event) => {
+    const filePath = event.data?.name || "";
+
+    if (!filePath.endsWith(".jpg") || !filePath.includes("/fotos/")) {
+      console.log("Ignorado: não é uma imagem jpg na pasta /fotos/");
+      return;
+    }
+
+    console.log(`Nova imagem detectada: ${filePath}`);
+
+    const pathParts = filePath.split("/");
+    const clienteId = pathParts[1];
+    const dispositivoId = pathParts[3];
+    const fileName = pathParts[pathParts.length - 1];
+
+    const bucket = admin.storage().bucket();
+    const tempFilePath = path.join(os.tmpdir(), fileName);
+
+    // Baixar imagem temporariamente
+    await bucket.file(filePath).download({destination: tempFilePath});
+    console.log("Imagem baixada localmente:", tempFilePath);
+
+    // Enviar ao Azure
+    const formData = new FormData();
+    formData.append("image", fs.createReadStream(tempFilePath), {
+      contentType: "image/jpeg",
+      filename: fileName,
+    });
+
+    let resultado;
+    try {
+      const response = await axios.post("https://agroscan.azurewebsites.net/api/predict", formData, {
+        headers: formData.getHeaders(),
+      });
+      resultado = response.data;
+      console.log("Classificação recebida:", resultado);
+    } catch (error) {
+      console.error("Erro ao chamar Azure Function:", error);
+      return;
+    }
+
+    const resultPath = (
+      `/clientes/${clienteId}/dispositivos/${dispositivoId}` +
+    `/dados/${fileName.replace(".jpg", "")}/resultado/`
+    );
+
+    await admin.database().ref(resultPath).set(resultado);
+    console.log(`Resultado salvo em ${resultPath}`);
+
+    fs.unlinkSync(tempFilePath);
+  });
