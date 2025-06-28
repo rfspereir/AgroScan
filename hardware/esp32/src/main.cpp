@@ -252,21 +252,21 @@ void initCamera() {
     s->set_gainceiling(s, GAINCEILING_32X); // Limite de ganho
     s->set_colorbar(s, 0);                  // 0 = sem barras de cor (desliga modo teste)
     //DEBUG:
-    DEBUG("=== CONFIGURAÇÕES ATUAIS DA CÂMERA ===");
-    DEBUGF("Brilho (brightness): %d\n", s->status.brightness);
-    DEBUGF("Contraste (contrast): %d\n", s->status.contrast);
-    DEBUGF("Saturação (saturation): %d\n", s->status.saturation);
-    DEBUGF("Efeito especial (special_effect): %d\n", s->status.special_effect);
-    DEBUGF("Auto White Balance (awb): %d\n", s->status.awb);
-    DEBUGF("Modo WB (wb_mode): %d\n", s->status.wb_mode);
-    DEBUGF("Auto Exposure Control 2 (aec2): %d\n", s->status.aec2);
-    DEBUGF("Ganho automático (agc): %d\n", s->status.agc);
-    DEBUGF("Colorbar ativado: %d\n", s->status.colorbar);
-    DEBUGF("Espelho horizontal (hmirror): %d\n", s->status.hmirror);
-    DEBUGF("Espelho vertical (vflip): %d\n", s->status.vflip);
-    DEBUGF("Denoise: %d\n", s->status.denoise);
-    DEBUGF("Correção de pixel ruim (bpc): %d\n", s->status.bpc);
-    DEBUGF("Correção de pixel branco (wpc): %d\n", s->status.wpc);
+    // DEBUG("=== CONFIGURAÇÕES ATUAIS DA CÂMERA ===");
+    // DEBUGF("Brilho (brightness): %d\n", s->status.brightness);
+    // DEBUGF("Contraste (contrast): %d\n", s->status.contrast);
+    // DEBUGF("Saturação (saturation): %d\n", s->status.saturation);
+    // DEBUGF("Efeito especial (special_effect): %d\n", s->status.special_effect);
+    // DEBUGF("Auto White Balance (awb): %d\n", s->status.awb);
+    // DEBUGF("Modo WB (wb_mode): %d\n", s->status.wb_mode);
+    // DEBUGF("Auto Exposure Control 2 (aec2): %d\n", s->status.aec2);
+    // DEBUGF("Ganho automático (agc): %d\n", s->status.agc);
+    // DEBUGF("Colorbar ativado: %d\n", s->status.colorbar);
+    // DEBUGF("Espelho horizontal (hmirror): %d\n", s->status.hmirror);
+    // DEBUGF("Espelho vertical (vflip): %d\n", s->status.vflip);
+    // DEBUGF("Denoise: %d\n", s->status.denoise);
+    // DEBUGF("Correção de pixel ruim (bpc): %d\n", s->status.bpc);
+    // DEBUGF("Correção de pixel branco (wpc): %d\n", s->status.wpc);
   }
   // Aguarda a câmera estabilizar
 
