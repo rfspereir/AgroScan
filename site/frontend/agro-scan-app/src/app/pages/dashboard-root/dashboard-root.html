@@ -1,68 +1,68 @@
-<app-topbar
-  [totalClientes]="totalClientes"
-  [totalDispositivos]="totalDispositivos"
-  [totalUsuarios]="totalUsuarios"
+<app-topbar [totalClientes]="totalClientes" [totalDispositivos]="totalDispositivos" [totalUsuarios]="totalUsuarios"
   [totalDispositivosPre]="totalDispositivosPre">
 </app-topbar>
 
 <div class="dashboard">
 
   <!-- Seletor de dispositivo -->
-  <div *ngIf="auth.getRole() !== 'root' && dispositivos.length > 0" class="filtro-dispositivo">
-    <label for="seletorDispositivo">Selecionar Dispositivo:</label>
-    <select [(ngModel)]="dispositivoSelecionado" (change)="onDispositivoChange()">
-      <option [value]="''"[defaultSelected]="">Selecione o dispositivo</option>
-      <option *ngFor="let disp of dispositivos" [value]="disp.uid">{{ disp.nome || disp.uid }}</option>
+  <div class="filtro-dispositivo" *ngIf="auth.getRole() !== 'root' && dispositivos.length > 0">
+    <label for="seletorDispositivo">Selecionar Dispositivo: </label>
+    <select id="seletorDispositivo" [(ngModel)]="dispositivoSelecionado" (change)="onDispositivoChange()">
+      <option value="" disabled selected>Selecione o dispositivo</option>
+      <option *ngFor="let disp of dispositivos" [value]="disp.uid">
+        {{ disp.nome || disp.uid }}
+      </option>
     </select>
   </div>
 
+  <!-- Layout principal -->
   <div class="dashboard-layout" *ngIf="auth.getRole() !== 'root' && dispositivoSelecionado">
-  
-  <!-- Coluna 1: Galeria -->
-  <div class="coluna-galeria" *ngIf="fotosCapturadas.length > 0">
-    <div class="galeria-container">
-      <div class="miniaturas">
-        <img *ngFor="let foto of fotosCapturadas.slice(-6); let i = index"
-            [src]="foto.url"
-            alt="Foto {{ i + 1 }}"
-            [class.selecionada]="i === fotoSelecionada"
-            (click)="fotoSelecionada = i" />
+    <!-- Coluna da galeria -->
+    <div class="coluna-galeria" *ngIf="fotosCapturadas.length > 0">
+      <h2>📸 Galeria</h2>
+      <div class="galeria-container">
+        <!-- Miniaturas -->
+        <div class="miniaturas">
+          <img *ngFor="let foto of fotosCapturadas.slice(-6); let i = index" [src]="foto.url" alt="Foto {{ i + 1 }}"
+            [class.selecionada]="i === fotoSelecionada" (click)="fotoSelecionada = i" />
+        </div>
+        <!-- Foto principal e informações -->
+        <div class="foto-principal">
+          <img [src]="fotosCapturadas.slice(-6)[fotoSelecionada]?.url" alt="Foto selecionada" />
+        </div>
       </div>
+    </div>
 
-      <div class="foto-principal">
-        <img [src]="fotosCapturadas.slice(-6)[fotoSelecionada]?.url" alt="Foto selecionada" />
-      </div>
-
+    <!-- Coluna das informações -->
+    <div class="coluna-grafico">
+      <!-- Tabela de informações -->
+      <h2>📋 Informações</h2>
       <table class="tabela-info" *ngIf="fotosCapturadas.slice(-6)[fotoSelecionada]?.dados">
         <tr>
           <th>Timestamp</th>
-          <td>{{ fotosCapturadas.slice(-6)[fotoSelecionada].dados.timestamp || 'N/A' }}</td>
+          <td>{{ fotoSelecionadaDados?.timestamp || 'N/A' }}</td>
         </tr>
         <tr>
           <th>Temperatura</th>
-          <td>{{ fotosCapturadas.slice(-6)[fotoSelecionada].dados.temperatura || 'N/A' }} °C</td>
+          <td>{{ fotoSelecionadaDados?.temperatura || 'N/A' }} °C</td>
         </tr>
         <tr>
           <th>Umidade</th>
-          <td>{{ fotosCapturadas.slice(-6)[fotoSelecionada].dados.umidade | number:'1.2-2' }} %</td>
+          <td>{{ fotoSelecionadaDados?.umidade | number:'1.2-2' }} %</td>
         </tr>
         <tr>
           <th>Classe</th>
-          <td>{{ fotosCapturadas.slice(-6)[fotoSelecionada].dados.resultado.class || 'N/A' }}</td>
+          <td>{{ fotoSelecionadaDados?.resultado.class || 'N/A' }}</td>
         </tr>
         <tr>
           <th>Confiança</th>
-          <td>{{ fotosCapturadas.slice(-6)[fotoSelecionada].dados.resultado.confidence | number:'1.2-2' }} %</td>
+          <td>{{ fotoSelecionadaDados?.resultado.confidence | number:'1.2-2' }} %</td>
         </tr>
       </table>
-
+      <!-- Geáfico de DHT11-->
+      <h2>📊 Gráfico do Dispositivo</h2>
+      <canvas id="graficoDispositivo"></canvas>
     </div>
-  </div>
 
-  <!-- Coluna 2: Gráfico -->
-  <div class="coluna-grafico">
-    <h2>Gráfico do Dispositivo</h2>
-    <canvas id="graficoDispositivo" width="400" height="200"></canvas>
   </div>
-
 </div>

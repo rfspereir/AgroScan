@@ -1,60 +1,16 @@
-/* --------------------- VARIÁVEIS --------------------- */
-:root {
-  --cor-branco: #ffffff;
-  --cor-cinza-claro: #f5f5f5;
-  --cor-cinza-medio: #cccccc;
-  --cor-primaria: #007bff;
-  --sombra-leve: 0 2px 8px rgba(0, 0, 0, 0.1);
-  --sombra-media: 0 2px 10px rgba(0, 0, 0, 0.2);
-}
-
-/* --------------------- CARTÕES --------------------- */
-.cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));  
-  gap: 16px;
-  margin-top: 20px;
-}
-
-.card {
-  background-color: var(--cor-branco);
-  padding: 16px;
-  border-radius: 8px;
-  border: 1px solid var(--cor-cinza-medio);
-  box-shadow: var(--sombra-leve);
-  text-align: center;
-  max-width: 250px;
+/* --------------------- CONTAINER PRINCIPAL --------------------- */
+.dashboard {
+  padding: 0 1.5rem;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 /* --------------------- SELETOR DE DISPOSITIVO --------------------- */
 .filtro-dispositivo {
-  margin: 20px 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  margin-top: 1.5rem;
 }
 
-.filtro-dispositivo label {
-  font-weight: 600;
-}
-
-.filtro-dispositivo select {
-  padding: 8px 12px;
-  border: 1px solid var(--cor-cinza-medio);
-  border-radius: 6px;
-  background-color: var(--cor-branco);
-  box-shadow: var(--sombra-leve);
-  font-size: 15px;
-  width: fit-content;
-  cursor: pointer;
-  transition: border 0.2s;
-}
-
-.filtro-dispositivo select:hover {
-  border-color: var(--cor-primaria);
-}
-
-/* --------------------- GALERIA + GRÁFICO (lado a lado) --------------------- */
+/* --------------------- LAYOUT DAS DUAS COLUNAS --------------------- */
 .dashboard-layout {
   display: flex;
   flex-direction: row;
@@ -63,26 +19,29 @@
   flex-wrap: wrap;
 }
 
-.coluna-galeria, .coluna-grafico {
+.coluna-galeria,
+.coluna-grafico {
   flex: 1;
   min-width: 300px;
 }
 
-/* --------------------- GALERIA --------------------- */
+/* --------------------- GALERIA E FOTO --------------------- */
 .galeria-container {
   display: flex;
   flex-direction: row;
   gap: 20px;
   align-items: flex-start;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  width: 100%;
 }
 
 .miniaturas {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-height: 400px;
+  max-height: 60%;
   overflow-y: auto;
+  flex-shrink: 0;
 }
 
 .miniaturas img {
@@ -99,31 +58,99 @@
   border-color: var(--cor-primaria);
 }
 
+.foto-principal {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
 .foto-principal img {
-  width: 600px;
-  height: 450px;
+  width: 100%;
+  max-width: 800px;
+  height: auto;
   object-fit: cover;
   border-radius: 8px;
   box-shadow: var(--sombra-media);
 }
 
-/* --------------------- INFO DA FOTO --------------------- */
-.info-foto {
-  margin-top: 10px;
+/* --------------------- TABELA INFO --------------------- */
+.tabela-info {
+  margin-top: 16px;
+  width: 100%;
   font-size: 14px;
-  line-height: 1.6;
+  border-collapse: collapse;
+  background-color: var(--cor-branco);
+  border-radius: 6px;
+  box-shadow: var(--sombra-leve);
+  overflow: hidden;
+}
+
+.tabela-info th,
+.tabela-info td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--cor-cinza-claro);
+  text-align: left;
+}
+
+.tabela-info th {
+  background-color: var(--cor-cinza-claro);
+  color: #333;
+  font-weight: 600;
 }
 
 /* --------------------- GRÁFICO --------------------- */
-#graficoDispositivo, #myChart {
+#graficoDispositivo {
   width: 100%;
   height: 400px;
   max-width: 100%;
 }
 
-/* --------------------- MENSAGEM DE AVISO --------------------- */
-.aviso {
-  margin-top: 20px;
-  color: #666;
-  font-style: italic;
+/* --------------------- RESPONSIVIDADE --------------------- */
+@media (max-width: 1024px) {
+  .dashboard-layout {
+    flex-direction: column;
+  }
+
+  .foto-principal img {
+    width: 100%;
+    height: auto;
+  }
+
+  .miniaturas {
+    flex-direction: row;
+    flex-wrap: wrap;
+    max-height: unset;
+  }
+
+  .miniaturas img {
+    width: 60px;
+    height: 45px;
+  }
+
+  .galeria-container {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .coluna-grafico {
+    margin-top: 30px;
+  }
+}
+
+@media (max-width: 600px) {
+  .tabela-info th,
+  .tabela-info td {
+    font-size: 13px;
+    padding: 6px 8px;
+  }
+
+  .miniaturas img {
+    width: 50px;
+    height: 40px;
+  }
+
+  .dashboard {
+    padding: 0 1rem;
+  }
 }

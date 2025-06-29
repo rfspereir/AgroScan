@@ -1,53 +1,35 @@
 <div class="topbar">
-  <div class="logo">AgroScan</div>
+  <div class="topbar-left">
+    <div class="logo">🌿 AgroScan</div>
 
-  <!-- Cartões de dados gerais -->
-  <div class="topbar-cards">
-    <div class="card" *ngIf="auth.getRole() === 'root'">
-      <h2>Clientes</h2>
-      <p>{{ totalClientes }}</p>
-    </div>
-
-    <div class="card">
-      <h2>Disp. Provis.</h2>
-      <p>{{ totalDispositivos }}</p>
-    </div>
-
-    <div class="card">
-      <h2>Usuários</h2>
-      <p>{{ totalUsuarios }}</p>
-    </div>
-
-    <div class="card">
-      <h2>Disp. Pré-cadas.</h2>
-      <p>{{ totalDispositivosPre }}</p>
-    </div>
+    <!-- <div class="topbar-cards">
+      <div class="card" *ngIf="auth.getRole() === 'root'">
+        <h2>Clientes</h2>
+        <p>{{ totalClientes }}</p>
+      </div>
+      <div class="card">
+        <h2>Disp. Provis.</h2>
+        <p>{{ totalDispositivos }}</p>
+      </div>
+      <div class="card">
+        <h2>Usuários</h2>
+        <p>{{ totalUsuarios }}</p>
+      </div>
+      <div class="card">
+        <h2>Disp. Pré-cadas.</h2>
+        <p>{{ totalDispositivosPre }}</p>
+      </div>
+    </div> -->
   </div>
-  
-  <nav>
-  <!-- Link para o Dashboard (mostra para todos os usuários) -->
-  <a routerLink="/dashboard-root">Dashboard</a>
 
-  <!-- Link para 'Clientes' - Somente para 'root' -->
-  <a *ngIf="auth.getRole() === 'root'" routerLink="/clientes">Clientes</a>
-
-  <!-- Link para 'Usuários' - Somente para 'root' -->
-  <a *ngIf="auth.getRole() === 'root' || auth.getRole() === 'admin_cliente'" routerLink="/usuarios">Usuários</a>
-
-  <!-- Link para 'Pré-Cadastro de Dispositivos' - Somente para 'root' e 'admin_cliente' -->
-  <a *ngIf="auth.getRole() === 'root' || auth.getRole() === 'admin_cliente'" routerLink="/PreCadastroDisp">Pré-Cadastro-Dispositivos</a>
-
-  <!-- Link para 'Dispositivos' - Somente para 'admin_cliente' -->
-  <a *ngIf="auth.getRole() === 'admin_cliente'" routerLink="/dispositivos">Dispositivos</a>
-
-  <!-- Link para 'Permissões' - Somente para 'root' -->
-  <a *ngIf="auth.getRole() === 'root'" routerLink="/permissoes">Permissões</a>
-
-  <!-- Link para 'Logs' - Somente para 'root'
-  <a *ngIf="auth.getRole() === 'root'" routerLink="/logs">Logs</a> -->
-
-  <!-- Botão de Logout - Sempre visível -->
-  <button class="logout" (click)="logout()">Sair</button>
-</nav>
-
+  <nav class="topbar-nav">
+    <a routerLink="/dashboard-root">Dashboard</a>
+    <a *ngIf="auth.getRole() === 'root'" routerLink="/clientes">Clientes</a>
+    <a *ngIf="auth.getRole() === 'root' || auth.getRole() === 'admin_cliente'" routerLink="/usuarios">Usuários</a>
+    <a *ngIf="auth.getRole() === 'root' || auth.getRole() === 'admin_cliente'" routerLink="/PreCadastroDisp">Pré-Cadastro</a>
+    <a *ngIf="auth.getRole() === 'admin_cliente'" routerLink="/dispositivos">Dispositivos</a>
+    <a *ngIf="auth.getRole() === 'root'" routerLink="/permissoes">Permissões</a>
+    <!-- <a *ngIf="auth.getRole() === 'root'" routerLink="/logs">Logs</a> -->
+    <button class="logout" (click)="logout()">Sair</button>
+  </nav>
 </div>

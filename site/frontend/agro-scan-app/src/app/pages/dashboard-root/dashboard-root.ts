@@ -6,7 +6,7 @@ import { Database, ref, get, child } from '@angular/fire/database';
 import { AuthService } from '../../services/auth.service';
 import { FormsModule } from '@angular/forms';
 import { Chart } from 'chart.js/auto';
-import { getStorage, ref as storageRef, getDownloadURL, listAll, getMetadata} from '@angular/fire/storage';
+import { getStorage, ref as storageRef, getDownloadURL, listAll, getMetadata } from '@angular/fire/storage';
 
 @Component({
   selector: 'app-dashboard-root',
@@ -34,7 +34,7 @@ export class DashboardRoot implements OnInit {
   dadosImagemSelecionada: any = null;
   lineChartData: any;
 
-  constructor(private db: Database, public auth: AuthService) {}
+  constructor(private db: Database, public auth: AuthService) { }
 
   ngOnInit(): void {
     if (this.auth.getRole() !== 'root') {
@@ -71,11 +71,11 @@ export class DashboardRoot implements OnInit {
         }
       }
       console.log('Valores enviados ao Topbar:', {
-      totalClientes: this.totalClientes,
-      totalDispositivos: this.totalDispositivos,
-      totalUsuarios: this.totalUsuarios,
-      totalDispositivosPre: this.totalDispositivosPre
-    });
+        totalClientes: this.totalClientes,
+        totalDispositivos: this.totalDispositivos,
+        totalUsuarios: this.totalUsuarios,
+        totalDispositivosPre: this.totalDispositivosPre
+      });
 
     } catch (error) {
       console.error('Erro ao carregar dados do dashboard:', error);
@@ -113,7 +113,7 @@ export class DashboardRoot implements OnInit {
   }
 
   async carregarFotosPorDispositivo(dispositivoId: string) {
-    
+
     const storage = getStorage();
     const clienteId = this.auth.getClienteId();
     const dbRef = ref(this.db);
@@ -123,9 +123,9 @@ export class DashboardRoot implements OnInit {
 
     if (!dispositivoId) {
       console.warn('Dispositivo não selecionado');
-    return;
+      return;
     }
-    
+
     try {
       const fotosRef = storageRef(storage, `clientes/${clienteId}/dispositivos/${dispositivoId}/fotos`);
       const listResult = await listAll(fotosRef);
@@ -137,7 +137,7 @@ export class DashboardRoot implements OnInit {
       const arquivosOrdenados = listResult.items
         .sort((a, b) => b.name.localeCompare(a.name));
 
-      const fotosAtuais = arquivosOrdenados.slice(0, this.limiteFotos-1);
+      const fotosAtuais = arquivosOrdenados.slice(0, this.limiteFotos - 1);
 
       for (const item of fotosAtuais) {
         const url = await getDownloadURL(item);
@@ -294,4 +294,8 @@ export class DashboardRoot implements OnInit {
       }]
     };
   }
+  get fotoSelecionadaDados() {
+    return this.fotosCapturadas.slice(-6)[this.fotoSelecionada]?.dados;
+  }
+
 }
