@@ -382,13 +382,13 @@ void enviarDadosFirebase(void *pvParameters) {
           if (!isnan(temperatura) && temperatura != 0) {
             json["temperatura"] = temperatura;
           } else {
-            DEBUG("Sensor DHT11 ausente ou leitura de temperatura inválida.");
+            //DEBUG("Sensor DHT11 ausente ou leitura de temperatura inválida.");
           }
 
           if (!isnan(umidade)&& umidade != 0) {
             json["umidade"] = umidade;
           } else {
-            DEBUG("Sensor DHT11 ausente ou leitura de umidade inválida.");
+            //DEBUG("Sensor DHT11 ausente ou leitura de umidade inválida.");
           }
 
           writeToFirebaseRTDB(DATABASE_URL, dbPath, idToken, json);
