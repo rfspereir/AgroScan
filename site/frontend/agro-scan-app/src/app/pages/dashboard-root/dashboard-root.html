@@ -6,11 +6,11 @@
   <div class="filtro-dispositivo" *ngIf="auth.getRole() !== 'root' && dispositivos.length > 0">
     <label for="seletorDispositivo">Selecionar Dispositivo: </label>
     <select id="seletorDispositivo" [(ngModel)]="dispositivoSelecionado" (change)="onDispositivoChange()">
-      <option value="" disabled selected>Selecione o dispositivo</option>
+    <option value="" selected>Selecione o dispositivo</option>
       <option *ngFor="let disp of dispositivos" [value]="disp.uid">
         {{ disp.nome || disp.uid }}
       </option>
-    </select>
+</select>
   </div>
 
   <!-- Layout principal -->

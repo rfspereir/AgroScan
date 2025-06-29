@@ -31,6 +31,7 @@ export class Login {
 
     try {
       await this.authService.login(this.email.trim(), this.password.trim());
+      await this.authService.loadCustomClaims();
       this.router.navigate(['/dashboard-root']);
     } catch (error) {
       console.error('Erro no login:', error);

@@ -89,7 +89,7 @@ export class DashboardRoot implements OnInit {
       if (snapshot.exists()) {
         const dados = snapshot.val();
         this.dispositivos = Object.keys(dados).map((key) => ({ uid: key, ...dados[key] }));
-        this.dispositivoSelecionado = this.dispositivos[0]?.uid;
+        // this.dispositivoSelecionado = this.dispositivos[0]?.uid;
       }
     } catch (error) {
       console.error('Erro ao buscar dispositivos:', error);
