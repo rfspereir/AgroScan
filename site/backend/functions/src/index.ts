@@ -1,18 +1,21 @@
-import {onCall} from "firebase-functions/v2/https";
+import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
-import * as admin from "firebase-admin";
+import {initializeApp} from "firebase-admin/app";
+import {getAuth} from "firebase-admin/auth";
+import {getDatabase} from "firebase-admin/database";
+import {getStorage} from "firebase-admin/storage";
 import * as functions from "firebase-functions";
-import cors from "cors";
 
 import * as path from "path";
 import * as os from "os";
 import * as fs from "fs";
+import {randomInt} from "crypto";
 import axios from "axios";
 import {onObjectFinalized} from "firebase-functions/v2/storage";
 import FormData from "form-data";
 
 
-admin.initializeApp();
+initializeApp();
 
 export const createUser = onCall(async (request) => {
   const auth = request.auth;
@@ -28,18 +31,18 @@ export const createUser = onCall(async (request) => {
     throw new Error("Campos obrigatórios ausentes.");
   }
 
-  const user = await admin.auth().createUser({
+  const user = await getAuth().createUser({
     email,
     password,
     displayName: nome,
   });
 
-  await admin.auth().setCustomUserClaims(user.uid, {
+  await getAuth().setCustomUserClaims(user.uid, {
     clienteId,
     role,
   });
 
-  await admin.database()
+  await getDatabase()
     .ref(`clientes/${clienteId}/usuarios/${user.uid}`)
     .set({nome, email, role});
 
@@ -63,10 +66,10 @@ export const deleteUser = onCall(async (request) => {
   }
 
   // Remove do Auth
-  await admin.auth().deleteUser(uid);
+  await getAuth().deleteUser(uid);
 
   // Remove do RTDB
-  await admin.database().ref(`clientes/${clienteId}/usuarios/${uid}`).remove();
+  await getDatabase().ref(`clientes/${clienteId}/usuarios/${uid}`).remove();
 
   return {message: "Usuário excluído com sucesso."};
 });
@@ -86,13 +89,13 @@ export const editUser = onCall(async (request) => {
   }
 
   // Atualiza no RTDB
-  await admin.database().ref(`clientes/${clienteId}/usuarios/${uid}`).update({
+  await getDatabase().ref(`clientes/${clienteId}/usuarios/${uid}`).update({
     nome,
     role,
   });
 
   // Atualiza displayName no Auth (opcional)
-  await admin.auth().updateUser(uid, {displayName: nome});
+  await getAuth().updateUser(uid, {displayName: nome});
 
   return {message: "Usuário atualizado com sucesso."};
 });
@@ -118,7 +121,7 @@ function gerarSenhaAleatoria(tamanho = 16): string {
   "abcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=";
   let senha = "";
   for (let i = 0; i < tamanho; i++) {
-    senha += caracteres.charAt(Math.floor(Math.random() * caracteres.length));
+    senha += caracteres.charAt(randomInt(caracteres.length));
   }
   return senha;
 }
@@ -146,7 +149,7 @@ export const createDeviceV2 = functions.https.onRequest(async (req, res) => {
 
 
     // Busca direta no caminho mapaSn/{sn}
-    const snRef = await admin.database().ref(
+    const snRef = await getDatabase().ref(
       `mapaSn/${normalizedSn}`).get();
 
     if (!snRef.exists()) {
@@ -165,7 +168,7 @@ export const createDeviceV2 = functions.https.onRequest(async (req, res) => {
     const email = `${dispositivoId}@agroscan.com`;
 
     try {
-      await admin.auth().createUser({
+      await getAuth().createUser({
         uid: dispositivoId,
         email: email,
         password: senhaGerada});
@@ -184,13 +187,13 @@ export const createDeviceV2 = functions.https.onRequest(async (req, res) => {
       }
     }
     // Definir claims personalizados no usuário
-    await admin.auth().setCustomUserClaims(dispositivoId, {
+    await getAuth().setCustomUserClaims(dispositivoId, {
       clienteId,
       role: "dispositivo",
     });
 
     // Registrar o dispositivo no nó definitivo
-    await admin.database().ref(
+    await getDatabase().ref(
       `clientes/${clienteId}/dispositivos/${dispositivoId}`).set({
       mac,
       nome,
@@ -199,10 +202,10 @@ export const createDeviceV2 = functions.https.onRequest(async (req, res) => {
     });
 
     // Remove do mapaSn após cadastro
-    await admin.database().ref(`mapaSn/${dispositivoId}`).remove();
+    await getDatabase().ref(`mapaSn/${dispositivoId}`).remove();
 
     // Gera o custom token
-    // const customToken = await admin.auth().createCustomToken(dispositivoId);
+    // const customToken = await getAuth().createCustomToken(dispositivoId);
 
     res.status(200).send({
       uid: dispositivoId,
@@ -217,93 +220,93 @@ export const createDeviceV2 = functions.https.onRequest(async (req, res) => {
   }
 });
 
-const corsHandler = cors({origin: true});
+/**
+ * Verifica se o SN é uma chave válida para o RTDB e para o prefixo do Storage.
+ * @param {unknown} sn - Valor recebido do cliente.
+ * @return {boolean} Retorna true se o SN for uma string segura.
+ */
+function isSnValido(sn: unknown): sn is string {
+  return typeof sn === "string" && /^[A-Za-z0-9_-]+$/.test(sn.trim());
+}
 
-export const deleteDevice = functions.https.onRequest(async (req, res) => {
-  corsHandler(req, res, async () => {
-    if (req.method !== "POST") {
-      res.status(405).send("Method Not Allowed");
-      return;
-    }
+export const deleteDevice = onCall(async (request) => {
+  const auth = request.auth;
+  const role = auth?.token.role;
 
-    const {sn} = req.body;
+  if (role !== "root" && role !== "admin_cliente") {
+    throw new HttpsError("permission-denied", "Acesso negado.");
+  }
 
-    if (!sn) {
-      res.status(400).send("Campo SN é obrigatório.");
-      return;
-    }
+  const {sn} = request.data;
 
-    const normalizedSn = sn.trim().toUpperCase();
+  if (!isSnValido(sn)) {
+    throw new HttpsError("invalid-argument", "Campo SN inválido.");
+  }
 
-    try {
-      // Busca o clienteId no RTDB
-      const snapshot = await admin.database().ref("mapaSn").orderByKey()
-        .equalTo(normalizedSn).once("value");
+  const normalizedSn = sn.trim().toUpperCase();
 
-      let clienteId = null;
+  // Busca o clienteId no RTDB
+  const snapshot = await getDatabase().ref(`mapaSn/${normalizedSn}`).get();
 
-      if (snapshot.exists()) {
-        const dados = snapshot.val();
-        const item = dados[normalizedSn];
-        clienteId = item?.clienteId;
-      } else {
-        // Caso já não esteja no mapaSn, tenta buscar no nó definitivo
-        const allClientesSnap = await admin.database().ref(
-          "clientes").once("value");
-        const allClientes = allClientesSnap.val();
-        for (const cid in allClientes) {
-          if (Object.prototype.hasOwnProperty.call(allClientes, cid)) {
-            const dispositivos = allClientes[cid]?.dispositivos || {};
-            if (dispositivos[normalizedSn]) {
-              clienteId = cid;
-              break;
-            }
-          }
+  let clienteId = null;
+
+  if (snapshot.exists()) {
+    clienteId = snapshot.val()?.clienteId;
+  } else {
+    // Caso já não esteja no mapaSn, tenta buscar no nó definitivo
+    const allClientesSnap = await getDatabase().ref(
+      "clientes").once("value");
+    const allClientes = allClientesSnap.val();
+    for (const cid in allClientes) {
+      if (Object.prototype.hasOwnProperty.call(allClientes, cid)) {
+        const dispositivos = allClientes[cid]?.dispositivos || {};
+        if (dispositivos[normalizedSn]) {
+          clienteId = cid;
+          break;
         }
       }
-
-      if (!clienteId) {
-        res.status(404).send("Dispositivo não encontrado.");
-        return;
-      }
-
-      // Deleta do Authentication
-      try {
-        await admin.auth().deleteUser(normalizedSn);
-      } catch (err) {
-        if (isFirebaseAuthError(err)) {
-          if (err.code !== "auth/user-not-found") {
-            throw err;
-          }
-          // Usuário não encontrado, ignora
-        } else {
-          throw err;
-        }
-      }
-
-      // Deleta do RTDB
-      await admin.database().ref(
-        `clientes/${clienteId}/dispositivos/${normalizedSn}`
-      ).remove();
-
-      // Deleta do mapaSn, se existir
-      await admin.database().ref(`mapaSn/${normalizedSn}`).remove();
-
-      // Deletar fotos, dados, ou Storage
-      await admin.storage().bucket().deleteFiles({
-        prefix: `clientes/${clienteId}/dispositivos/${normalizedSn}/`,
-      });
-
-      res.status(200).send({
-        sn: normalizedSn,
-        clienteId,
-        message: "Dispositivo excluído com sucesso.",
-      });
-    } catch (error) {
-      console.error("Erro ao excluir dispositivo:", error);
-      res.status(500).send("Erro ao excluir dispositivo.");
     }
+  }
+
+  if (!clienteId) {
+    throw new HttpsError("not-found", "Dispositivo não encontrado.");
+  }
+
+  // admin_cliente só pode excluir dispositivos do próprio cliente
+  if (role !== "root" && auth?.token.clienteId !== clienteId) {
+    throw new HttpsError("permission-denied", "Acesso negado.");
+  }
+
+  // Deleta do Authentication
+  try {
+    await getAuth().deleteUser(normalizedSn);
+  } catch (err) {
+    if (!isFirebaseAuthError(err) || err.code !== "auth/user-not-found") {
+      throw err;
+    }
+    // Usuário não encontrado, ignora
+  }
+
+  // Deleta do RTDB
+  await getDatabase().ref(
+    `clientes/${clienteId}/dispositivos/${normalizedSn}`
+  ).remove();
+
+  // Deleta do mapaSn, se existir
+  await getDatabase().ref(`mapaSn/${normalizedSn}`).remove();
+
+  // Deletar fotos, dados, ou Storage
+  await getStorage().bucket().deleteFiles({
+    prefix: `clientes/${clienteId}/dispositivos/${normalizedSn}/`,
   });
+
+  logger.info(`Dispositivo excluído: ${normalizedSn} (cliente ${clienteId})`);
+
+  return {
+    sn: normalizedSn,
+    clienteId,
+    message: "Dispositivo excluído com sucesso.",
+  };
 });
 
 export const onImageUpload = onObjectFinalized(
@@ -326,7 +329,7 @@ export const onImageUpload = onObjectFinalized(
     const dispositivoId = pathParts[3];
     const fileName = pathParts[pathParts.length - 1];
 
-    const bucket = admin.storage().bucket();
+    const bucket = getStorage().bucket();
     const tempFilePath = path.join(os.tmpdir(), fileName);
 
     // Baixar imagem temporariamente
@@ -357,7 +360,7 @@ export const onImageUpload = onObjectFinalized(
     `/dados/${fileName.replace(".jpg", "")}/resultado/`
     );
 
-    await admin.database().ref(resultPath).set(resultado);
+    await getDatabase().ref(resultPath).set(resultado);
     console.log(`Resultado salvo em ${resultPath}`);
 
     fs.unlinkSync(tempFilePath);
