@@ -1,30 +1,22 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { firstValueFrom } from 'rxjs';
+import { Functions, httpsCallable } from '@angular/fire/functions';
 
 @Injectable({
   providedIn: 'root'
 })
 export class FirebaseFunctionsService {
 
-  private deleteDeviceUrl = 'https://deletedevice-5is4ontjcq-uc.a.run.app';
-
-  constructor(private http: HttpClient) {}
+  constructor(private functions: Functions) {}
 
   /**
    * Chama a função deleteDevice para remover um dispositivo.
+   * A chamada é autenticada com o token do usuário logado.
    * @param sn Número de série (SN) do dispositivo.
    * @returns Promise com a resposta da função.
    */
   async deleteDevice(sn: string) {
-    const body = { sn: sn.trim().toUpperCase() };
-
-    const headers = new HttpHeaders({
-      'Content-Type': 'application/json'
-    });
-
-    return await firstValueFrom(
-      this.http.post(this.deleteDeviceUrl, body, { headers })
-    );
+    const deleteDevice = httpsCallable(this.functions, 'deleteDevice');
+    const result = await deleteDevice({ sn: sn.trim().toUpperCase() });
+    return result.data;
   }
 }

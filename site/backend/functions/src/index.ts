@@ -1,11 +1,10 @@
-import {onCall} from "firebase-functions/v2/https";
+import {HttpsError, onCall} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import {initializeApp} from "firebase-admin/app";
 import {getAuth} from "firebase-admin/auth";
 import {getDatabase} from "firebase-admin/database";
 import {getStorage} from "firebase-admin/storage";
 import * as functions from "firebase-functions";
-import cors from "cors";
 
 import * as path from "path";
 import * as os from "os";
@@ -221,93 +220,93 @@ export const createDeviceV2 = functions.https.onRequest(async (req, res) => {
   }
 });
 
-const corsHandler = cors({origin: true});
+/**
+ * Verifica se o SN é uma chave válida para o RTDB e para o prefixo do Storage.
+ * @param {unknown} sn - Valor recebido do cliente.
+ * @return {boolean} Retorna true se o SN for uma string segura.
+ */
+function isSnValido(sn: unknown): sn is string {
+  return typeof sn === "string" && /^[A-Za-z0-9_-]+$/.test(sn.trim());
+}
 
-export const deleteDevice = functions.https.onRequest(async (req, res) => {
-  corsHandler(req, res, async () => {
-    if (req.method !== "POST") {
-      res.status(405).send("Method Not Allowed");
-      return;
-    }
+export const deleteDevice = onCall(async (request) => {
+  const auth = request.auth;
+  const role = auth?.token.role;
 
-    const {sn} = req.body;
+  if (role !== "root" && role !== "admin_cliente") {
+    throw new HttpsError("permission-denied", "Acesso negado.");
+  }
 
-    if (!sn) {
-      res.status(400).send("Campo SN é obrigatório.");
-      return;
-    }
+  const {sn} = request.data;
 
-    const normalizedSn = sn.trim().toUpperCase();
+  if (!isSnValido(sn)) {
+    throw new HttpsError("invalid-argument", "Campo SN inválido.");
+  }
 
-    try {
-      // Busca o clienteId no RTDB
-      const snapshot = await getDatabase().ref("mapaSn").orderByKey()
-        .equalTo(normalizedSn).once("value");
+  const normalizedSn = sn.trim().toUpperCase();
 
-      let clienteId = null;
+  // Busca o clienteId no RTDB
+  const snapshot = await getDatabase().ref(`mapaSn/${normalizedSn}`).get();
 
-      if (snapshot.exists()) {
-        const dados = snapshot.val();
-        const item = dados[normalizedSn];
-        clienteId = item?.clienteId;
-      } else {
-        // Caso já não esteja no mapaSn, tenta buscar no nó definitivo
-        const allClientesSnap = await getDatabase().ref(
-          "clientes").once("value");
-        const allClientes = allClientesSnap.val();
-        for (const cid in allClientes) {
-          if (Object.prototype.hasOwnProperty.call(allClientes, cid)) {
-            const dispositivos = allClientes[cid]?.dispositivos || {};
-            if (dispositivos[normalizedSn]) {
-              clienteId = cid;
-              break;
-            }
-          }
+  let clienteId = null;
+
+  if (snapshot.exists()) {
+    clienteId = snapshot.val()?.clienteId;
+  } else {
+    // Caso já não esteja no mapaSn, tenta buscar no nó definitivo
+    const allClientesSnap = await getDatabase().ref(
+      "clientes").once("value");
+    const allClientes = allClientesSnap.val();
+    for (const cid in allClientes) {
+      if (Object.prototype.hasOwnProperty.call(allClientes, cid)) {
+        const dispositivos = allClientes[cid]?.dispositivos || {};
+        if (dispositivos[normalizedSn]) {
+          clienteId = cid;
+          break;
         }
       }
-
-      if (!clienteId) {
-        res.status(404).send("Dispositivo não encontrado.");
-        return;
-      }
-
-      // Deleta do Authentication
-      try {
-        await getAuth().deleteUser(normalizedSn);
-      } catch (err) {
-        if (isFirebaseAuthError(err)) {
-          if (err.code !== "auth/user-not-found") {
-            throw err;
-          }
-          // Usuário não encontrado, ignora
-        } else {
-          throw err;
-        }
-      }
-
-      // Deleta do RTDB
-      await getDatabase().ref(
-        `clientes/${clienteId}/dispositivos/${normalizedSn}`
-      ).remove();
-
-      // Deleta do mapaSn, se existir
-      await getDatabase().ref(`mapaSn/${normalizedSn}`).remove();
-
-      // Deletar fotos, dados, ou Storage
-      await getStorage().bucket().deleteFiles({
-        prefix: `clientes/${clienteId}/dispositivos/${normalizedSn}/`,
-      });
-
-      res.status(200).send({
-        sn: normalizedSn,
-        clienteId,
-        message: "Dispositivo excluído com sucesso.",
-      });
-    } catch (error) {
-      console.error("Erro ao excluir dispositivo:", error);
-      res.status(500).send("Erro ao excluir dispositivo.");
     }
+  }
+
+  if (!clienteId) {
+    throw new HttpsError("not-found", "Dispositivo não encontrado.");
+  }
+
+  // admin_cliente só pode excluir dispositivos do próprio cliente
+  if (role !== "root" && auth?.token.clienteId !== clienteId) {
+    throw new HttpsError("permission-denied", "Acesso negado.");
+  }
+
+  // Deleta do Authentication
+  try {
+    await getAuth().deleteUser(normalizedSn);
+  } catch (err) {
+    if (!isFirebaseAuthError(err) || err.code !== "auth/user-not-found") {
+      throw err;
+    }
+    // Usuário não encontrado, ignora
+  }
+
+  // Deleta do RTDB
+  await getDatabase().ref(
+    `clientes/${clienteId}/dispositivos/${normalizedSn}`
+  ).remove();
+
+  // Deleta do mapaSn, se existir
+  await getDatabase().ref(`mapaSn/${normalizedSn}`).remove();
+
+  // Deletar fotos, dados, ou Storage
+  await getStorage().bucket().deleteFiles({
+    prefix: `clientes/${clienteId}/dispositivos/${normalizedSn}/`,
   });
+
+  logger.info(`Dispositivo excluído: ${normalizedSn} (cliente ${clienteId})`);
+
+  return {
+    sn: normalizedSn,
+    clienteId,
+    message: "Dispositivo excluído com sucesso.",
+  };
 });
 
 export const onImageUpload = onObjectFinalized(
